@@ -393,8 +393,13 @@ Once launched, navigate to `http://localhost:8501` in your browser to interact w
 
 ## ⚡ API Integration & Live Prototype
 
-To run the live 5-minute automated prediction engine with Upstox API v2:
+The production environment features a **unified single-process architecture**. The background Upstox collection daemon, autoregressive lag feature pipeline (39 features), pre-trained Random Forest prediction engine, and interactive dashboard run concurrently inside a single command:
 
+```bash
+streamlit run "streamlit dashboard.py"
+```
+
+### Setup & Execution Steps:
 1. **Configure API Credentials:**
    Copy `.env.example` to `.env`:
    ```bash
@@ -405,16 +410,22 @@ To run the live 5-minute automated prediction engine with Upstox API v2:
    UPSTOX_ACCESS_TOKEN=your_token_here
    ```
 
-2. **Verify API Connection:**
+2. **Verify API Connection (Optional Diagnostic):**
    ```bash
    python "connect to api.py"
    ```
 
-3. **Start Live 5-Minute Engine:**
+3. **Launch Unified Live Application:**
+   ```bash
+   streamlit run "streamlit dashboard.py"
+   ```
+   *The integrated background daemon thread synchronizes with the NSE 5-minute wall-clock (09:15–15:30 IST), fetches live NIFTY option-chain snapshots, engineers exact 5m and 10m autoregressive lags, predicts future implied volatility, and updates the dashboard without freezing user interactions.*
+
+4. **Standalone Headless Daemon (Optional):**
+   If you wish to run the collector in headless CLI mode on a dedicated server without the web interface:
    ```bash
    python "live_iv_predictor.py"
    ```
-   *The engine will fetch real-time option chain snapshots, compute exact time-to-expiry and lag features, invoke the pre-trained Random Forest model, and append predictions to `data/live/live_iv_predictions.csv`.*
 
 ---
 

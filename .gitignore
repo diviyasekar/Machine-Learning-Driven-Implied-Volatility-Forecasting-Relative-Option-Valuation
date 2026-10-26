@@ -48,6 +48,9 @@ secrets.json
 # IDEs and Editors
 .idea/
 .vscode/
+*.backup.py
+*.bak
+
 *.swp
 *.swo
 *~

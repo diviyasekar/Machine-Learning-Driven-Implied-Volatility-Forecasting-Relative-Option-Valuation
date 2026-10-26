@@ -700,34 +700,36 @@ Evaluated on an empirical near-ATM benchmark contract:
 ## 🚀 Module 9: Production Live Predictor & Interactive Streamlit Dashboard (Steps 24A, 25B)
 
 ### 9.1 Architectural Purpose & Operational Scope
-The system transitions from retrospective backtesting to live production execution via two complementary runtime components:
-1. `live_iv_predictor.py`: An autonomous, headless, multi-threaded 5-minute background prediction daemon.
-2. `streamlit dashboard.py`: An institutional-grade dark-themed web interface for visualization, risk monitoring, and real-time decision support.
+The system transitions from retrospective backtesting to live production execution via two deployment modalities:
+1. **Unified Live Streamlit Application (`streamlit dashboard.py`)**: A consolidated single-process application where the background 5-minute Upstox collector daemon (`LiveCollectorDaemon`), feature pipeline, Random Forest inference, and interactive institutional UI run concurrently without requiring multiple terminals.
+2. **Autonomous Headless Daemon (`live_iv_predictor.py`)**: An optional standalone CLI background prediction daemon for server or headless deployments.
 
 ### 9.2 Mermaid Production System Architecture
 ```mermaid
 flowchart TD
-    subgraph DataEngine["Live Ingestion Daemon (live_iv_predictor.py)"]
-        Clock[Wall-Clock 5-Min Timer] --> APIPoll[Upstox API v2 Live Chain Fetcher]
-        APIPoll --> MemoryBuffer[(Rolling 3-Snapshot History Buffer)]
-        MemoryBuffer --> FeatureAligner[Compute Exact TTE & 5m/10m Lags]
-        FeatureAligner --> Imputer[Apply Training Feature Medians]
-        Imputer --> LoadedRF[Pre-Trained Random Forest Model]
-        LoadedRF --> LivePreds[(Append to data/live/live_iv_predictions.csv)]
-    end
+    subgraph UnifiedApp["Unified Live Application (streamlit dashboard.py)"]
+        subgraph DataEngine["Integrated Background Daemon Worker"]
+            Clock[Wall-Clock 5-Min Timer] --> APIPoll[Upstox API v2 Live Chain Fetcher]
+            APIPoll --> MemoryBuffer[(Rolling Snapshot History Buffer)]
+            MemoryBuffer --> FeatureAligner[Compute Exact TTE & 5m/10m Lags]
+            FeatureAligner --> Imputer[Apply Training Feature Medians]
+            Imputer --> LoadedRF[Pre-Trained Random Forest Model]
+            LoadedRF --> LivePreds[(Append to data/live/live_iv_predictions.csv)]
+        end
 
-    subgraph UserInterface["Interactive Web App (streamlit dashboard.py)"]
-        LivePreds --> Watcher[File State Watcher / Auto-Refresh]
-        Watcher --> UI_Router{8-Page Navigation Router}
+        subgraph UserInterface["Interactive Web App (Multi-Page UI)"]
+            LivePreds --> Watcher[Thread-Safe State & Auto-Refresh]
+            Watcher --> UI_Router{8-Page Navigation Router}
 
-        UI_Router --> P1[1. Overview: KPIs & PCR]
-        UI_Router --> P2[2. Option Chain: Interactive Grid]
-        UI_Router --> P3[3. Volatility Smile: Skew Curves]
-        UI_Router --> P4[4. ML Diagnostics: Residuals & Importance]
-        UI_Router --> P5[5. Relative Valuation: Screener]
-        UI_Router --> P6[6. Stress Testing: What-If Slider Matrix]
-        UI_Router --> P7[7. Robustness Test: Expiry Analysis]
-        UI_Router --> P8[8. Data & Settings: Export Tools]
+            UI_Router --> P1[1. Overview: KPIs & PCR]
+            UI_Router --> P2[2. Option Chain: Interactive Grid]
+            UI_Router --> P3[3. Volatility Smile: Skew Curves]
+            UI_Router --> P4[4. ML Diagnostics: Residuals & Importance]
+            UI_Router --> P5[5. Relative Valuation: Screener]
+            UI_Router --> P6[6. Stress Testing: Interactive BSM What-If Sliders]
+            UI_Router --> P7[7. Robustness Test: Expiry Analysis]
+            UI_Router --> P8[8. Data & Settings: Export Tools]
+        end
     end
 ```
 
