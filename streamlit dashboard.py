@@ -684,6 +684,18 @@ def is_market_open(now_ist=None):
 
 
 class LiveCollectorDaemon:
+    # Class-level defaults to ensure backward-compatibility with cached daemon singletons
+    data_version = 0
+    status = "Initializing"
+    message = "Daemon starting..."
+    last_collection_time = None
+    last_forecast_bucket = None
+    snapshot_count = 0
+    error_count = 0
+    target_expiry = None
+    is_running = True
+    force_flag = False
+
     def __init__(self):
         self.lock = threading.Lock()
         self.wake_event = threading.Event()
@@ -802,11 +814,25 @@ class LiveCollectorDaemon:
 
 
 @st.cache_resource(show_spinner=False)
-def get_collector_daemon():
+def get_collector_daemon(_cache_token="v2_dual_pacing_2026"):
     return LiveCollectorDaemon()
 
 
-COLLECTOR = get_collector_daemon()
+COLLECTOR = get_collector_daemon("v2_dual_pacing_2026")
+
+# Fallback defensive initialization for cached singletons across hot-reloads
+if not hasattr(COLLECTOR, "data_version"):
+    setattr(COLLECTOR, "data_version", 0)
+if not hasattr(COLLECTOR, "last_forecast_bucket"):
+    setattr(COLLECTOR, "last_forecast_bucket", None)
+if not hasattr(COLLECTOR, "snapshot_count"):
+    setattr(COLLECTOR, "snapshot_count", 0)
+if not hasattr(COLLECTOR, "error_count"):
+    setattr(COLLECTOR, "error_count", 0)
+if not hasattr(COLLECTOR, "status"):
+    setattr(COLLECTOR, "status", "Initializing")
+if not hasattr(COLLECTOR, "message"):
+    setattr(COLLECTOR, "message", "Daemon starting...")
 
 
 # ============================================================
@@ -1030,7 +1056,7 @@ with st.sidebar:
     COLLECTOR.set_target_expiry(selected_expiry)
 
     # Status card
-    last_t = COLLECTOR.last_collection_time
+    last_t = getattr(COLLECTOR, "last_collection_time", None)
     time_str = last_t.strftime("%d %b %Y, %I:%M %p") if last_t else datetime.now().strftime("%d %b %Y, %I:%M %p")
 
     st.markdown(
@@ -1163,10 +1189,17 @@ def live_auto_refresher():
         unsafe_allow_html=True,
     )
 
-    # Check if fresh market data arrived from background thread
+    # Check if fresh market data arrived from background thread or CSV update
     if auto_refresh_on:
         last_ver = st.session_state.get("last_data_version", 0)
-        current_ver = COLLECTOR.data_version
+        current_ver = getattr(COLLECTOR, "data_version", 0)
+        if RAW_CHAIN_FILE.exists():
+            try:
+                file_ver = int(RAW_CHAIN_FILE.stat().st_mtime)
+                current_ver = max(current_ver, file_ver)
+            except Exception:
+                pass
+
         if current_ver > last_ver:
             st.session_state["last_data_version"] = current_ver
             st.rerun()
@@ -1789,8 +1822,8 @@ elif page == "🗄 Data & Settings":
         st.subheader("Operational Diagnostics")
         st.write("**Base Workspace:**", str(BASE))
         st.write("**Target Active Expiry:**", selected_expiry)
-        st.write("**Collector Worker Status:**", COLLECTOR.status)
-        st.write("**Last Collector Message:**", COLLECTOR.message)
+        st.write("**Collector Worker Status:**", getattr(COLLECTOR, "status", "Active"))
+        st.write("**Last Collector Message:**", getattr(COLLECTOR, "message", "Running"))
         st.write("**Model Features Loaded:**", len(MODEL_FEATURES))
         st.write("**Execution Mode:**", "Live Streaming" if IS_LIVE else "Offline Baseline")
 
