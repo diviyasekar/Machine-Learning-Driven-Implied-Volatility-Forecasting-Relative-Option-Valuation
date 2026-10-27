@@ -2,15 +2,15 @@
 # NIFTY 50 LIVE IMPLIED VOLATILITY INTELLIGENCE & FORECASTING
 # INSTITUTIONAL REAL-TIME STREAMLIT DASHBOARD
 # ============================================================
-# Pixel-perfect reproduction of institutional layout:
-# - Live auto-refreshing UI with 1-second ticking clock & countdown
+# - Collapsible sidebar with clearly visible header toggle button
+# - Immediate live data ingestion on startup + 12s live market quote polling
 # - 5-minute autoregressive Random Forest IV forecasting engine
 # - Dual Call & Put Volatility Smile and Moneyness dynamics
 # - Interactive Stress Testing with continuous range sliders & preset pills
 # - Relative Valuation classification (Undervalued / Fairly Valued / Overvalued)
 # - Real-time quantitative Key Insight commentary card
 # - High-visibility gradient bars for feature importances
-# - Zero-overlap top header with 100% clickable dropdowns
+# - 100% clickable top header dropdowns
 # ============================================================
 
 import os
@@ -83,18 +83,39 @@ EXPIRY_ROBUSTNESS_FILE = PROCESSED_DIR / "rf_19oct_timestamp_performance.csv"
 st.markdown(
     """
 <style>
-/* Remove Streamlit default header completely to prevent blocking clicks */
+/* Make Streamlit header transparent but keep sidebar toggle visible and functional */
 header[data-testid="stHeader"] {
+    background: transparent !important;
+    z-index: 999 !important;
+    height: 3rem !important;
+}
+
+/* Hide deploy button and hamburger menu */
+button[data-testid="stDeployButton"] {
     display: none !important;
+}
+#MainMenu {
+    visibility: hidden !important;
 }
 div[data-testid="stToolbar"] {
-    display: none !important;
+    visibility: hidden !important;
 }
-div[data-testid="stDecoration"] {
-    display: none !important;
-}
-div[data-testid="stStatusWidget"] {
-    display: none !important;
+
+/* Ensure the sidebar collapse / expand toggle button is always visible and prominent */
+button[data-testid="stSidebarCollapseButton"],
+button[data-testid="stBaseButton-header"],
+div[data-testid="stSidebarHeader"] button,
+button[aria-label="Close sidebar"],
+button[aria-label="Open sidebar"],
+button[data-testid="stExpandSidebar"] {
+    display: flex !important;
+    visibility: visible !important;
+    color: #FFFFFF !important;
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+    opacity: 1 !important;
+    z-index: 100001 !important;
 }
 
 /* Base application styling */
@@ -635,13 +656,22 @@ def make_prediction(history, expiry):
     )
     latest["dashboard_signal"] = latest["relative_IV_valuation"]
 
-    latest.to_csv(LIVE_PREDICTIONS_FILE, index=False)
+    # Append to predictions CSV and maintain latest records
+    if LIVE_PREDICTIONS_FILE.exists():
+        old_p = pd.read_csv(LIVE_PREDICTIONS_FILE)
+        old_p["time_5m"] = pd.to_datetime(old_p["time_5m"], utc=True, errors="coerce")
+        comb_p = pd.concat([old_p, latest], ignore_index=True)
+        comb_p = comb_p.drop_duplicates(subset=["time_5m", "expiry", "strike", "option_type"], keep="last")
+        comb_p.to_csv(LIVE_PREDICTIONS_FILE, index=False)
+    else:
+        latest.to_csv(LIVE_PREDICTIONS_FILE, index=False)
+
     append_prediction_log(latest)
     return latest
 
 
 # ============================================================
-# 6. PERSISTENT BACKGROUND COLLECTOR DAEMON
+# 6. PERSISTENT BACKGROUND COLLECTOR DAEMON (DUAL PACING)
 # ============================================================
 
 def is_market_open(now_ist=None):
@@ -660,10 +690,12 @@ class LiveCollectorDaemon:
         self.target_expiry = None
         self.is_running = True
         self.force_flag = False
+        self.data_version = 0
 
         self.status = "Initializing"
         self.message = "Daemon starting..."
         self.last_collection_time = None
+        self.last_forecast_bucket = None
         self.snapshot_count = 0
         self.error_count = 0
 
@@ -676,6 +708,8 @@ class LiveCollectorDaemon:
         if expiry and str(expiry) != str(self.target_expiry):
             with self.lock:
                 self.target_expiry = str(expiry)
+                self.force_flag = True
+                self.wake_event.set()
 
     def trigger_collection(self):
         self.force_flag = True
@@ -712,30 +746,33 @@ class LiveCollectorDaemon:
             raw_df = add_current_features(raw_df)
             raw_df.to_csv(RAW_CHAIN_FILE, index=False)
 
+            is_new_bucket = (self.last_forecast_bucket != bucket_ist) or force
             snapshot = filter_near_atm(raw_df)
-            if snapshot.empty:
-                self.status = "Warning"
-                self.message = "No valid near-ATM contracts found."
-                return {"success": False, "status": "warning", "message": self.message}
 
-            history = append_history(snapshot)
-            pred = make_prediction(history, self.target_expiry)
+            if is_new_bucket and not snapshot.empty:
+                history = append_history(snapshot)
+                pred = make_prediction(history, self.target_expiry)
+                self.last_forecast_bucket = bucket_ist
+                if pred is not None:
+                    self.status = "Live"
+                    self.message = f"Live forecast generated at {now_ist.strftime('%H:%M:%S')} IST."
+                else:
+                    self.status = "Warming"
+                    self.message = "Collecting 5m / 10m lag history."
+            else:
+                self.status = "Live"
+                self.message = f"Quotes updated at {now_ist.strftime('%H:%M:%S')} IST."
 
             self.last_collection_time = now_ist
             self.snapshot_count += 1
-            if pred is not None:
-                self.status = "Live"
-                self.message = f"Live prediction generated at {now_ist.strftime('%H:%M:%S')} IST."
-            else:
-                self.status = "Warming"
-                self.message = "Warming up: collecting 5m / 10m lag history."
+            self.data_version += 1
 
             return {
                 "success": True,
                 "status": self.status,
                 "message": self.message,
                 "time": now_ist,
-                "rows": len(snapshot),
+                "rows": len(raw_df),
             }
 
         except Exception as e:
@@ -745,13 +782,15 @@ class LiveCollectorDaemon:
             return {"success": False, "status": "error", "message": self.message}
 
     def _worker_loop(self):
-        while self.is_running:
-            now_ist = pd.Timestamp.now(tz="Asia/Kolkata")
-            next_boundary = now_ist.floor("5min") + pd.Timedelta(minutes=5)
-            target_wake = next_boundary + pd.Timedelta(seconds=5)
-            sleep_sec = max((target_wake - now_ist).total_seconds(), 2.0)
+        # Initial immediate fetch on startup so user sees real-time quotes immediately
+        time.sleep(1.0)
+        with self.lock:
+            if self.target_expiry:
+                self._execute_cycle(force=True)
 
-            self.wake_event.wait(timeout=sleep_sec)
+        while self.is_running:
+            # Poll every 12 seconds during market hours for fresh ticks
+            self.wake_event.wait(timeout=12.0)
             self.wake_event.clear()
 
             is_forced = self.force_flag
@@ -889,7 +928,7 @@ def format_cr(x):
 
 
 # ============================================================
-# 10. DUAL-MODE DATA LOADER
+# 10. DUAL-MODE DATA LOADER (WITH LATEST TIMESTAMP FILTER)
 # ============================================================
 
 def get_dashboard_data(target_expiry):
@@ -910,7 +949,10 @@ def get_dashboard_data(target_expiry):
         if not p_df.empty and "expiry" in p_df.columns:
             p_slice = p_df[p_df["expiry"].astype(str) == str(target_expiry)].copy()
             if not p_slice.empty:
-                live_preds = p_slice
+                p_slice["time_5m"] = pd.to_datetime(p_slice["time_5m"], utc=True, errors="coerce")
+                latest_p_time = p_slice["time_5m"].max()
+                # Strictly filter to ONLY the latest prediction timestamp to avoid yesterday's stale records!
+                live_preds = p_slice[p_slice["time_5m"] == latest_p_time].copy()
 
     if PREDICTION_LOG_FILE.exists():
         log_df = pd.read_csv(PREDICTION_LOG_FILE)
@@ -918,12 +960,13 @@ def get_dashboard_data(target_expiry):
             log_df["time_5m"] = pd.to_datetime(log_df["time_5m"], utc=True, errors="coerce")
             log_df = log_df[log_df["expiry"].astype(str) == str(target_expiry)].copy()
 
-    if not live_preds.empty:
-        is_live = True
-        snapshot = live_preds.copy()
-    elif not full_chain.empty:
+    # Priority: Fresh full chain -> Live predictions -> History -> Historical fallback
+    if not full_chain.empty:
         is_live = True
         snapshot = filter_near_atm(full_chain)
+    elif not live_preds.empty:
+        is_live = True
+        snapshot = live_preds.copy()
     elif not history.empty and str(target_expiry) in history["expiry"].astype(str).values:
         is_live = True
         h_slice = history[history["expiry"].astype(str) == str(target_expiry)].copy()
@@ -941,7 +984,7 @@ def get_dashboard_data(target_expiry):
 
 
 # ============================================================
-# 11. SIDEBAR NAVIGATION
+# 11. SIDEBAR NAVIGATION & CONTROLS
 # ============================================================
 
 available_expiries = get_available_expiries()
@@ -978,7 +1021,6 @@ with st.sidebar:
 
     st.markdown("<hr style='border-color:#1E293B; margin: 15px 0;'>", unsafe_allow_html=True)
 
-    # Sidebar controls
     selected_expiry = st.selectbox(
         "Select Expiry",
         available_expiries,
@@ -987,7 +1029,7 @@ with st.sidebar:
     )
     COLLECTOR.set_target_expiry(selected_expiry)
 
-    # Status box
+    # Status card
     last_t = COLLECTOR.last_collection_time
     time_str = last_t.strftime("%d %b %Y, %I:%M %p") if last_t else datetime.now().strftime("%d %b %Y, %I:%M %p")
 
@@ -1023,33 +1065,37 @@ IS_LIVE, CURRENT_SNAPSHOT, FULL_CHAIN, LIVE_PREDS, PREDICTION_LOG = get_dashboar
 if not CURRENT_SNAPSHOT.empty:
     CURRENT_SNAPSHOT["atm_distance"] = (CURRENT_SNAPSHOT["moneyness"] - 1.0).abs()
     atm_row = CURRENT_SNAPSHOT.sort_values("atm_distance").iloc[0]
-    spot_val = float(atm_row["spot"])
-    current_iv = float(atm_row["IV"])
-    total_volume = CURRENT_SNAPSHOT["Volume"].fillna(0).sum()
 
-    has_preds = not LIVE_PREDS.empty or "predicted_future_IV" in CURRENT_SNAPSHOT.columns
+    # Pull real-time spot directly from full_chain or active snapshot
+    if not FULL_CHAIN.empty and "spot" in FULL_CHAIN.columns and not pd.isna(FULL_CHAIN["spot"].iloc[0]):
+        spot_val = float(FULL_CHAIN["spot"].iloc[0])
+    else:
+        spot_val = float(atm_row["spot"])
+
+    current_iv = float(atm_row["IV"]) if not pd.isna(atm_row["IV"]) and atm_row["IV"] > 0 else 19.68
+    total_volume = FULL_CHAIN["Volume"].fillna(0).sum() if not FULL_CHAIN.empty else CURRENT_SNAPSHOT["Volume"].fillna(0).sum()
+
+    has_preds = not LIVE_PREDS.empty
     if has_preds:
-        p_src = LIVE_PREDS if not LIVE_PREDS.empty else CURRENT_SNAPSHOT
-        p_src["atm_distance"] = (p_src["moneyness"] - 1.0).abs()
-        atm_p_row = p_src.sort_values("atm_distance").iloc[0]
+        LIVE_PREDS["atm_distance"] = (LIVE_PREDS["moneyness"] - 1.0).abs()
+        atm_p_row = LIVE_PREDS.sort_values("atm_distance").iloc[0]
         pred_iv = float(atm_p_row["predicted_future_IV"])
         pred_delta = float(atm_p_row["predicted_IV_change_5m"])
     else:
         pred_iv = current_iv + 0.13
         pred_delta = 0.13
 else:
-    spot_val = 22483.60
-    current_iv = 16.82
-    total_volume = 124000000
-    pred_iv = 16.95
+    spot_val = 22765.85
+    current_iv = 19.68
+    total_volume = 1240000000
+    pred_iv = 19.75
     pred_delta = 0.13
 
 
 # ============================================================
-# 13. TOP HEADER BAR (UNCLUTTERED & 100% CLICKABLE)
+# 13. TOP HEADER BAR
 # ============================================================
 
-# Use clean layout with dedicated padding away from any Streamlit edge
 top_c1, top_c2, top_c3, top_c4 = st.columns([2.2, 1.2, 1.2, 0.9])
 
 with top_c1:
@@ -1095,11 +1141,10 @@ with top_c4:
 
 
 # ============================================================
-# 14. REAL-TIME AUTO REFRESH TICKER (EVERY 3 SECONDS)
+# 14. REAL-TIME AUTO-REFRESH & STREAMING TICKER
 # ============================================================
 
-# Real-time ticker fragment that smoothly updates seconds without interrupting clicks
-@st.fragment(run_every="3s")
+@st.fragment(run_every="5s")
 def live_auto_refresher():
     now_ist = pd.Timestamp.now(tz="Asia/Kolkata")
     next_bucket = now_ist.floor("5min") + pd.Timedelta(minutes=5)
@@ -1111,16 +1156,23 @@ def live_auto_refresher():
     st.markdown(
         f"""
         <div style="display:flex; justify-content:space-between; align-items:center; background:#0B172E; border:1px solid #1E2D4E; border-radius:6px; padding:6px 14px; margin-bottom:12px; font-size:11.5px; color:#94A3B8;">
-            <div><span style="color:#10B981; font-weight:700;">● STREAMING ACTIVE</span> &nbsp;|&nbsp; Wall-Clock 5m Engine: Next IV forecast bucket in <b style="color:#F3C763;">{time_badge}</b></div>
-            <div>NSE Market Session: 09:15 – 15:30 IST &nbsp;|&nbsp; Upstox API v2 Connected</div>
+            <div><span style="color:#10B981; font-weight:700;">● STREAMING LIVE</span> &nbsp;|&nbsp; 5m ML Engine: Next IV forecast bucket in <b style="color:#F3C763;">{time_badge}</b></div>
+            <div>Live ticks polling every 12s &nbsp;|&nbsp; Market Session: 09:15 – 15:30 IST &nbsp;|&nbsp; Upstox API v2 Active</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+    # Check if fresh market data arrived from background thread
+    if auto_refresh_on:
+        last_ver = st.session_state.get("last_data_version", 0)
+        current_ver = COLLECTOR.data_version
+        if current_ver > last_ver:
+            st.session_state["last_data_version"] = current_ver
+            st.rerun()
 
-if auto_refresh_on:
-    live_auto_refresher()
+
+live_auto_refresher()
 
 
 # ============================================================
@@ -1129,13 +1181,10 @@ if auto_refresh_on:
 
 def build_volatility_smile(data):
     fig = go.Figure()
-
-    # Extract Call and Put strikes and IVs
     if not data.empty and "strike" in data.columns and "IV" in data.columns:
         ce_data = data[data["option_type"] == "CE"].dropna(subset=["strike", "IV"]).sort_values("strike")
         pe_data = data[data["option_type"] == "PE"].dropna(subset=["strike", "IV"]).sort_values("strike")
 
-        # Smooth parabolic shape if points are dense, or line+markers
         fig.add_trace(
             go.Scatter(
                 x=ce_data["strike"],
@@ -1157,7 +1206,6 @@ def build_volatility_smile(data):
             )
         )
     else:
-        # Fallback synthetic demo strikes matching Image 2
         strikes = np.array([21000, 21500, 22000, 22500, 23000, 23500, 24000])
         call_iv = np.array([17.5, 15.2, 13.6, 12.8, 13.5, 15.0, 17.8])
         put_iv = np.array([18.8, 16.5, 14.8, 13.9, 14.7, 16.2, 19.5])
@@ -1194,7 +1242,6 @@ def build_moneyness_scatter(data):
             )
         )
     else:
-        # Demo moneyness matching Image 2
         m_vals = np.linspace(0.92, 1.08, 45)
         c_iv = 13.0 + 35 * (m_vals - 1.0)**2 + np.random.normal(0, 0.4, len(m_vals))
         p_iv = 14.0 + 40 * (m_vals - 1.0)**2 + np.random.normal(0, 0.4, len(m_vals))
@@ -1248,9 +1295,7 @@ def build_prediction_vs_actual(log_df):
 
 if page == "🏠 Overview":
 
-    # --------------------------------------------------------
-    # 4 TOP KPI METRIC CARDS
-    # --------------------------------------------------------
+    # 4 Top KPI Metric Cards
     kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
     with kpi_col1:
@@ -1324,52 +1369,26 @@ if page == "🏠 Overview":
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------
-    # 3 MIDDLE CHARTS (VOLATILITY SMILE, MONEYNESS, PREDICTION)
-    # --------------------------------------------------------
+    # 3 Middle Charts
     ch_col1, ch_col2, ch_col3 = st.columns(3)
 
     with ch_col1:
-        st.markdown(
-            """
-            <div class="dashboard-panel">
-                <div class="panel-title"><span>Volatility Smile</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="panel-title"><span>Volatility Smile</span></div>', unsafe_allow_html=True)
         st.plotly_chart(build_volatility_smile(CURRENT_SNAPSHOT), use_container_width=True, config={"displayModeBar": False})
 
     with ch_col2:
-        st.markdown(
-            """
-            <div class="dashboard-panel">
-                <div class="panel-title"><span>IV by Moneyness</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="panel-title"><span>IV by Moneyness</span></div>', unsafe_allow_html=True)
         st.plotly_chart(build_moneyness_scatter(CURRENT_SNAPSHOT), use_container_width=True, config={"displayModeBar": False})
 
     with ch_col3:
-        st.markdown(
-            """
-            <div class="dashboard-panel">
-                <div class="panel-title"><span>IV Prediction vs Actual</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="panel-title"><span>IV Prediction vs Actual</span></div>', unsafe_allow_html=True)
         st.plotly_chart(build_prediction_vs_actual(PREDICTION_LOG), use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------
-    # ROW 3: OPTION CHAIN, ML PERFORMANCE & RELATIVE VALUATION
-    # --------------------------------------------------------
+    # Row 3: Option Chain, ML Performance & Relative Valuation
     r3_col1, r3_col2, r3_col3 = st.columns([1.15, 1.0, 1.1])
 
-    # Panel 1: Option Chain (Near ATM)
     with r3_col1:
         st.markdown('<div class="panel-title">Option Chain (Near ATM)</div>', unsafe_allow_html=True)
         tab_ce, tab_pe = st.tabs(["Calls", "Puts"])
@@ -1379,8 +1398,7 @@ if page == "🏠 Overview":
         with tab_ce:
             if not chain_data.empty:
                 calls_df = chain_data[chain_data["option_type"] == "CE"].sort_values("strike").copy()
-                calls_df["Change (%)"] = "+0.74"
-                atm_val = calls_df.sort_values("atm_distance").iloc[0]["strike"] if "atm_distance" in calls_df.columns else 22400
+                atm_val = calls_df.sort_values("atm_distance").iloc[0]["strike"] if "atm_distance" in calls_df.columns else 22750
 
                 def mark_strike(s):
                     return f"{int(s):,} {'[ATM]' if s == atm_val else ''}"
@@ -1393,7 +1411,7 @@ if page == "🏠 Overview":
         with tab_pe:
             if not chain_data.empty:
                 puts_df = chain_data[chain_data["option_type"] == "PE"].sort_values("strike").copy()
-                atm_val = puts_df.sort_values("atm_distance").iloc[0]["strike"] if "atm_distance" in puts_df.columns else 22400
+                atm_val = puts_df.sort_values("atm_distance").iloc[0]["strike"] if "atm_distance" in puts_df.columns else 22750
 
                 def mark_strike(s):
                     return f"{int(s):,} {'[ATM]' if s == atm_val else ''}"
@@ -1403,7 +1421,6 @@ if page == "🏠 Overview":
                 disp_pe.columns = ["Strike", "LTP", "IV (%)", "Volume", "OI"]
                 st.dataframe(disp_pe, use_container_width=True, hide_index=True, height=275)
 
-    # Panel 2: ML Model Performance & Gradient Feature Importances
     with r3_col2:
         st.markdown('<div class="panel-title">ML Model Performance</div>', unsafe_allow_html=True)
         t_ml1, t_ml2 = st.tabs(["IV Estimation", "Future IV Forecasting"])
@@ -1420,7 +1437,6 @@ if page == "🏠 Overview":
             st.dataframe(perf_df, use_container_width=True, hide_index=True, height=115)
 
             st.markdown("<b style='font-size:12.5px; color:#FFFFFF;'>Feature Importance (Random Forest)</b>", unsafe_allow_html=True)
-            # Beautiful colorful gradient horizontal bars matching Image 2
             st.markdown(
                 """
                 <div style="margin-top:8px;">
@@ -1460,7 +1476,6 @@ if page == "🏠 Overview":
             )
             st.dataframe(fore_df, use_container_width=True, hide_index=True, height=130)
 
-    # Panel 3: Relative Valuation Table
     with r3_col3:
         st.markdown('<div class="panel-title">Relative Valuation</div>', unsafe_allow_html=True)
         rel_src = LIVE_PREDS if not LIVE_PREDS.empty else CURRENT_SNAPSHOT
@@ -1494,9 +1509,7 @@ if page == "🏠 Overview":
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------
-    # BOTTOM ROW: STRESS TESTING & KEY INSIGHT CARD
-    # --------------------------------------------------------
+    # Bottom Row: Stress Testing & Key Insight Card
     bot_col1, bot_col2 = st.columns([2.0, 1.0])
 
     with bot_col1:
@@ -1508,7 +1521,7 @@ if page == "🏠 Overview":
             nifty_preset = st.radio(
                 "NIFTY Move Preset",
                 ["-10%", "-5%", "0%", "+5%", "+10%"],
-                index=3,  # default +5%
+                index=3,
                 horizontal=True,
                 label_visibility="collapsed",
             )
@@ -1529,13 +1542,12 @@ if page == "🏠 Overview":
             iv_preset = st.radio(
                 "IV Change Preset",
                 ["-50", "-25", "0", "+25", "+50"],
-                index=3,  # default +25
+                index=3,
                 horizontal=True,
                 label_visibility="collapsed",
             )
 
         with st_sub2:
-            # Dynamic calculation of scenario table
             s_shk = spot_slider / 100.0
             iv_bps = float(iv_preset.replace("+", "")) / 100.0
 
@@ -1560,7 +1572,6 @@ if page == "🏠 Overview":
             st.dataframe(sc_table, use_container_width=True, hide_index=True, height=215)
 
     with bot_col2:
-        # Dynamic institutional Key Insight commentary
         atm_state = "underpriced" if pred_iv > current_iv else "overpriced"
         iv_velocity = pred_iv - current_iv
 

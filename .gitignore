@@ -50,6 +50,7 @@ secrets.json
 .vscode/
 *.backup.py
 *.bak
+~$*
 
 *.swp
 *.swo
