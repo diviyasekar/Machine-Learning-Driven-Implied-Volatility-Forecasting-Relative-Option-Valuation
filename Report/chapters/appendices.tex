@@ -1,52 +1,54 @@
 \chapter{Appendices}
 \label{chap:appendices}
 
-\section{Appendix A: Mathematical Derivations of Higher-Order Greeks}
+\section{Appendix A: Mathematical Derivations of Greeks and Lemma 1}
+\label{sec:appendix_lemma_proof}
+
+This appendix provides the full calculus proofs for the Black-Scholes-Merton foundational identity (Lemma 1), the primary Greeks ($\Delta, \nu, \Theta$), and higher-order cross-sensitivities (Vanna, Volga, Charm).
+
+\subsection{Proof of Lemma 1: The Boundary Identity $S N'(d_1) = K e^{-r\tau} N'(d_2)$}
+Recall $N'(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2 / 2}$ and $d_2 = d_1 - \sigma \sqrt{\tau}$. Evaluating the ratio:
+\begin{align}
+    \frac{S N'(d_1)}{K e^{-r\tau} N'(d_2)} &= \frac{S}{K e^{-r\tau}} \exp\left( -\tfrac{1}{2} (d_1^2 - d_2^2) \right) \\
+    &= \frac{S}{K e^{-r\tau}} \exp\left( -\tfrac{1}{2} [2 d_1 \sigma \sqrt{\tau} - \sigma^2 \tau] \right) = \frac{S}{K e^{-r\tau}} \exp(-\ln(S/K) - r\tau) = 1
+\end{align}
+Hence, $S N'(d_1) = K e^{-r\tau} N'(d_2)$ holds identically for all $S, K, \sigma > 0$ and $\tau > 0$ \quad $\blacksquare$.
+
+\subsection{Proof of Delta ($\Delta_C = N(d_1)$) and Vega ($\nu = S\sqrt{\tau}N'(d_1)$)}
+Differentiating $C = S N(d_1) - K e^{-r\tau} N(d_2)$ with respect to $S$:
+\begin{equation}
+    \frac{\partial C}{\partial S} = N(d_1) + \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial S} = N(d_1) \quad (\text{by Lemma 1})
+\end{equation}
+Differentiating $C$ with respect to $\sigma$ where $\frac{\partial d_2}{\partial \sigma} = \frac{\partial d_1}{\partial \sigma} - \sqrt{\tau}$:
+\begin{equation}
+    \frac{\partial C}{\partial \sigma} = \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial \sigma} + K e^{-r\tau} N'(d_2) \sqrt{\tau} = S \sqrt{\tau} N'(d_1) \quad (\text{by Lemma 1})
+\end{equation}
+
+\subsection{Proof of Theta ($\Theta_C = -\frac{S \sigma N'(d_1)}{2\sqrt{\tau}} - r K e^{-r\tau} N(d_2)$)}
+Differentiating $C$ with respect to $\tau$ where $\frac{\partial d_2}{\partial \tau} = \frac{\partial d_1}{\partial \tau} - \frac{\sigma}{2\sqrt{\tau}}$:
+\begin{equation}
+    \frac{\partial C}{\partial \tau} = \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial \tau} + \frac{K e^{-r\tau} N'(d_2) \sigma}{2\sqrt{\tau}} + r K e^{-r\tau} N(d_2) = \frac{S \sigma N'(d_1)}{2\sqrt{\tau}} + r K e^{-r\tau} N(d_2)
+\end{equation}
+Since $\Theta_C = -\partial C / \partial \tau$, this establishes Eq. \eqref{eq:theta_call}.
+
+\subsection{Derivations of Higher-Order Greeks (Vanna, Volga, Charm)}
 \label{sec:appendix_higher_order_greeks}
-
-While Chapter \ref{chap:algorithms} established the primary Greeks ($\Delta, \Gamma, \nu, \Theta$), advanced derivatives desks manage higher-order cross-sensitivities to hedge volatility-of-volatility and spot-volatility correlation risks.
-
-\subsection{Derivation of Vanna ($\frac{\partial \Delta}{\partial \sigma} = \frac{\partial \nu}{\partial S}$)}
-\textbf{Vanna} measures the cross-sensitivity of Delta with respect to volatility, identical to the change in Vega per unit shift in spot:
-\begin{equation}
-    \text{Vanna} = \frac{\partial \Delta_C}{\partial \sigma} = \frac{\partial^2 C}{\partial S \partial \sigma} = \frac{\partial [N(d_1)]}{\partial \sigma} = N'(d_1) \frac{\partial d_1}{\partial \sigma}
-\end{equation}
-From Section \ref{subsec:vega_derivation}, $\frac{\partial d_1}{\partial \sigma} = -\frac{\ln(S / K) + r \tau}{\sigma^2 \sqrt{\tau}} + \frac{1}{2} \sqrt{\tau} = -\frac{d_2}{\sigma}$. Substituting this relation:
-\begin{equation}
-    \text{Vanna} = -\frac{N'(d_1) d_2}{\sigma} = -\frac{e^{-d_1^2 / 2} d_2}{\sigma \sqrt{2\pi}}
-    \label{eq:vanna_formula}
-\end{equation}
-For at-the-money options ($d_2 \approx 0$), Vanna is zero. For out-of-the-money calls ($d_2 < 0$), Vanna is positive, indicating that a volatility spike increases call delta toward 0.50.
-
-\subsection{Derivation of Volga / Vomma ($\frac{\partial^2 C}{\partial \sigma^2} = \frac{\partial \nu}{\partial \sigma}$)}
-\textbf{Volga} measures the second-order sensitivity of the option price with respect to volatility (vega convexity):
-\begin{equation}
-    \text{Volga} = \frac{\partial \nu}{\partial \sigma} = \frac{\partial}{\partial \sigma} \left[ S \sqrt{\tau} N'(d_1) \right] = S \sqrt{\tau} \frac{\partial N'(d_1)}{\partial \sigma}
-\end{equation}
-Using the chain rule on the normal density $\frac{\partial N'(d_1)}{\partial \sigma} = -d_1 N'(d_1) \frac{\partial d_1}{\partial \sigma} = \frac{d_1 d_2}{\sigma} N'(d_1)$:
-\begin{equation}
-    \text{Volga} = S \sqrt{\tau} N'(d_1) \frac{d_1 d_2}{\sigma} = \nu \frac{d_1 d_2}{\sigma}
-    \label{eq:volga_formula}
-\end{equation}
-Volga is positive for out-of-the-money contracts ($d_1 d_2 > 0$), quantifying the non-linear tail gains achieved during volatility surges.
-
-\subsection{Derivation of Charm ($\frac{\partial \Delta}{\partial t} = -\frac{\partial \Delta}{\partial \tau}$)}
-\textbf{Charm} quantifies the deterministic rate of delta decay over time:
-\begin{equation}
-    \text{Charm}_C = -\frac{\partial N(d_1)}{\partial \tau} = -N'(d_1) \frac{\partial d_1}{\partial \tau} = -N'(d_1) \left[ \frac{r}{\sigma \sqrt{\tau}} - \frac{d_2}{2\tau} \right]
-    \label{eq:charm_formula}
-\end{equation}
-Charm drives the passive delta slippage that options market makers must rebalance overnight.
+\begin{align}
+    \text{Vanna} &= \frac{\partial \Delta_C}{\partial \sigma} = N'(d_1) \frac{\partial d_1}{\partial \sigma} = -\frac{N'(d_1) d_2}{\sigma} = -\frac{e^{-d_1^2 / 2} d_2}{\sigma \sqrt{2\pi}} \label{eq:vanna_formula} \\
+    \text{Volga} &= \frac{\partial \nu}{\partial \sigma} = S \sqrt{\tau} N'(d_1) \frac{d_1 d_2}{\sigma} = \nu \frac{d_1 d_2}{\sigma} \label{eq:volga_formula} \\
+    \text{Charm} &= -\frac{\partial \Delta_C}{\partial \tau} = -N'(d_1) \left[ \frac{r}{\sigma \sqrt{\tau}} - \frac{d_2}{2\tau} \right] \label{eq:charm_formula}
+\end{align}
 
 \section{Appendix B: Complete 39-Dimensional Feature Schema}
 \label{sec:appendix_feature_schema}
 
-The production machine learning pipeline serializes an exact 39-dimensional feature schema (\texttt{nifty\_iv\_model\_features.joblib}). Table \ref{tab:complete_feature_schema} outlines all 39 features, their lag horizons, and mathematical formulations.
+Table \ref{tab:complete_feature_schema} outlines all 39 serialized features (\texttt{nifty\_iv\_model\_features.joblib}).
 
+\vspace{-0.3cm}
 \begin{table}[H]
     \centering
-    \scriptsize
-    \renewcommand{\arraystretch}{0.88}
+    \tiny
+    \renewcommand{\arraystretch}{0.72}
     \caption{Complete 39-Dimensional Feature Schema Specification.}
     \label{tab:complete_feature_schema}
     \begin{tabularx}{\textwidth}{rllp{2.2cm}X}
@@ -71,10 +73,11 @@ The production machine learning pipeline serializes an exact 39-dimensional feat
     \end{tabularx}
 \end{table}
 
+\vspace{-0.3cm}
 \section{Appendix C: Core Algorithmic Source Code Modules}
 \label{sec:appendix_source_code}
 
-\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=3pt, xleftmargin=1.0em, lineskip=-1.5pt}
+\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=2pt, xleftmargin=0.8em, lineskip=-2.0pt}
 
 \subsection{C.1 Exact Fractional TTE Calculation \& Vectorized Lag Construction}
 \begin{lstlisting}[language=Python, caption={Exact Fractional TTE and Multi-Horizon Lag Construction.}]
@@ -100,16 +103,17 @@ def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
 
 \subsection{C.2 Production Live Inference \& Relative Valuation Screener}
 \begin{lstlisting}[language=Python, caption={Production Live Inference and Valuation Categorization.}]
-import joblib, numpy as np, pandas as pd
+import numpy as np
 
-def predict_and_screen(df: pd.DataFrame, model, feature_cols, medians) -> pd.DataFrame:
-    X = df.reindex(columns=feature_cols).fillna(medians)
-    df['pred_delta_iv'] = model.predict(X)
-    df['pred_future_iv'] = df['IV'] + df['pred_delta_iv']
-    df['valuation_spread'] = df['IV'] - df['pred_future_iv']
+def run_live_inference_and_valuation(current_features, model, schema, medians, delta_val=0.50):
+    X = current_features.reindex(columns=schema).fillna(medians)
+    pred_delta_iv = model.predict(X)
+    current_iv = current_features['IV'].values
+    pred_future_iv = current_iv + pred_delta_iv
+    valuation_spread = current_iv - pred_future_iv
     
-    # Tagging regimes with delta = 0.50 IV points
-    cond = [df['valuation_spread'] > 0.50, df['valuation_spread'] < -0.50]
-    df['valuation_tag'] = np.select(cond, ['Rich (High IV)', 'Cheap (Low IV)'], default='Fair / Neutral')
-    return df
+    # Economic regime tags
+    regimes = np.where(valuation_spread > delta_val, 'Rich / Overvalued',
+              np.where(valuation_spread < -delta_val, 'Cheap / Undervalued', 'Fair / Neutral'))
+    return pred_future_iv, pred_delta_iv, valuation_spread, regimes
 \end{lstlisting}

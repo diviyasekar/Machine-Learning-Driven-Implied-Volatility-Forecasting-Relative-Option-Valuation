@@ -150,13 +150,22 @@ To capture high-frequency theta decay, the quantitative pipeline engineers an **
     \text{TTE}_{\text{hours}} = \frac{T_{\text{expiry}} - t_{\text{current}}}{3600 \text{ seconds}}
     \label{eq:tte_hours}
 \end{equation}
+where:
+\begin{itemize}
+    \item $T_{\text{expiry}}$: The exact contract settlement instant (Thursday 15:30:00 IST) converted to POSIX epoch seconds.
+    \item $t_{\text{current}}$: Ingestion wall-clock timestamp down to second-level precision.
+    \item $3600$: Denominator converting raw seconds into continuous decimal hours.
+\end{itemize}
 
 When expressed in annual trading units $\tau$ for closed-form Black-Scholes evaluation, the fractional duration is converted using standard calendar convention:
 \begin{equation}
     \tau = \frac{\text{TTE}_{\text{hours}}}{24 \times 365} = \frac{\text{TTE}_{\text{hours}}}{8760}
     \label{eq:tau_annual}
 \end{equation}
-This continuous formulation ensures that the option pricing engine accurately measures the rapid acceleration of theta ($\Theta$) and gamma ($\Gamma$) across 5-minute sampling intervals.
+
+\noindent
+\textbf{Trader's Financial Intuition:}
+On weekly index options, Theta decay does not occur in daily steps; it bleeds continuously by the minute. For an ATM contract observed on Thursday at 14:00 IST, only $1.50$ trading hours remain ($\tau \approx 0.000171$). Using standard integer day rounding ($\tau = 0$ or $\tau = 1/365$) leads to massive pricing errors or division by zero. Exact fractional hours preserve smooth mathematical continuity, allowing the engine to model hyper-theta acceleration without numerical distortion.
 
 \section{Autoregressive Feature Construction \& Temporal Alignment}
 \label{sec:autoregressive_features}
@@ -166,30 +175,34 @@ To equip the predictive models with temporal memory without violating causality,
 The engineered feature space spans five functional categories:
 \begin{enumerate}
     \item \textbf{Strike Geometry \& Relative Moneyness:}
-    \begin{align}
-        \text{moneyness} &= \frac{K}{S_t} \\
-        \text{log\_moneyness} &= \ln\left(\frac{S_t}{K}\right)
-    \end{align}
+    \begin{equation}
+        \text{moneyness} = \frac{K}{S_t}, \quad \text{log\_moneyness} = \ln\left(\frac{S_t}{K}\right)
+    \end{equation}
+    \textit{Intuition:} Normalizes strike location across varying index levels, allowing models to learn invariant volatility smile curvature.
+
     \item \textbf{Continuous Temporal Variables:}
     \begin{equation}
         \text{exact\_tte\_hours} = \text{TTE}_{\text{hours}}(t)
     \end{equation}
+    \textit{Intuition:} Supplies the regression trees with the physical time coordinate to price non-linear decay.
+
     \item \textbf{Autoregressive Volatility Memory:}
     \begin{equation}
         \text{IV}_t = \sigma_{\text{market}}(t), \quad \text{IV}_{\text{lag}\_5m} = \sigma_{\text{market}}(t-5), \quad \text{IV}_{\text{lag}\_10m} = \sigma_{\text{market}}(t-10)
     \end{equation}
+    \textit{Intuition:} Captures the short-term persistence and autocorrelation of implied volatility states.
+
     \item \textbf{Volatility Momentum \& Velocity:}
-    \begin{align}
-        \text{IV\_change\_prev\_5m} &= \text{IV}_t - \text{IV}_{\text{lag}\_5m} \\
-        \text{IV\_change\_prev\_10m} &= \text{IV}_t - \text{IV}_{\text{lag}\_10m}
-    \end{align}
+    \begin{equation}
+        \text{IV\_change\_prev\_5m} = \text{IV}_t - \text{IV}_{\text{lag}\_5m}, \quad \text{IV\_change\_prev\_10m} = \text{IV}_t - \text{IV}_{\text{lag}\_10m}
+    \end{equation}
+    \textit{Intuition:} Measures the instantaneous velocity of volatility expansions or contractions. As revealed in empirical testing, this feature dominates static strike characteristics.
+
     \item \textbf{Market Microstructure \& Order Book Liquidity:}
-    \begin{align}
-        \text{bid\_ask\_spread} &= \text{Ask}_t - \text{Bid}_t \\
-        \text{bid\_ask\_spread\_lag\_5m} &= \text{Ask}_{t-5} - \text{Bid}_{t-5} \\
-        \text{spread\_ratio} &= \frac{\text{Ask}_t - \text{Bid}_t}{\text{LTP}_t} \\
-        \text{spot\_lag\_5m} &= S_{t-5}, \quad \Delta \text{spot}_{5m} = S_t - S_{t-5}
-    \end{align}
+    \begin{equation}
+        \text{bid\_ask\_spread} = \text{Ask}_t - \text{Bid}_t, \quad \text{spread\_ratio} = \frac{\text{Ask}_t - \text{Bid}_t}{\text{LTP}_t}, \quad \Delta \text{spot}_{5m} = S_t - S_{t-5}
+    \end{equation}
+    \textit{Intuition:} Proxies dealer inventory distress and adverse selection; sudden spread widening signals impending volatility jumps.
 \end{enumerate}
 
 Table \ref{tab:master_feature_catalog} summarizes the primary mathematical feature catalog deployed in the predictive engine.

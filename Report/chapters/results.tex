@@ -12,14 +12,20 @@ Models were trained strictly on the historical training set $\mathcal{T}_{\text{
     \begin{equation}
         \text{MAE} = \frac{1}{N} \sum_{i=1}^N \left| y_i - \widehat{y}_i \right|
     \end{equation}
+    where $y_i = \text{IV}_{t+5, i}$ is the true realized future implied volatility and $\widehat{y}_i$ is the model's prediction.
+    \textit{Trader's Intuition:} Measures the expected absolute pricing margin in volatility points; an MAE of $0.5214$ means the model's volatility forecast is within $\approx 0.52$ IV percentage points of market truth.
+
     \item \textbf{Root Mean Squared Error (RMSE):}
     \begin{equation}
         \text{RMSE} = \sqrt{\frac{1}{N} \sum_{i=1}^N (y_i - \widehat{y}_i)^2}
     \end{equation}
+    \textit{Trader's Intuition:} Squaring penalizes large outlier errors disproportionately. Because options desks face severe non-linear losses during volatility spikes, lowering RMSE directly mitigates tail-risk exposure.
+
     \item \textbf{Out-of-Sample Coefficient of Determination ($R^2$):}
     \begin{equation}
         R^2 = 1 - \frac{\sum_{i=1}^N (y_i - \widehat{y}_i)^2}{\sum_{i=1}^N (y_i - \bar{y}_{\text{test}})^2}
     \end{equation}
+    \textit{Trader's Intuition:} Quantifies the proportion of out-of-sample volatility variance captured; a negative score reveals that a model is worse than a simple horizontal mean.
 \end{enumerate}
 
 Table \ref{tab:master_model_performance} summarizes the comprehensive out-of-sample comparative results.
@@ -64,7 +70,7 @@ To assess model stability across the option chain, we inspect the out-of-sample 
 \subsection{Parity Alignment \& Incremental Volatility Velocity}
 Figures \ref{fig:actual_vs_predicted_iv} and \ref{fig:actual_vs_predicted_delta_iv} present the out-of-sample parity scatter plot and incremental volatility velocity tracking side-by-side.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}{0.48\textwidth}
         \centering
@@ -86,7 +92,7 @@ The actual versus predicted implied volatility points cluster tightly along the 
 \subsection{Comparative Error Distribution \& Feature Importance}
 Figures \ref{fig:rf_vs_persistence} and \ref{fig:feature_importance} display the comparative prediction error distribution ($y - \widehat{y}$) alongside the top Gini feature importances.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}{0.48\textwidth}
         \centering
@@ -187,7 +193,7 @@ Across the out-of-sample dataset, the 983 analyzed near-ATM option contracts are
     \item \textbf{Low IV / Cheap / Undervalued (6.61\% | 65 contracts):} Market IV trades at a discount exceeding $-0.50$ points below model forecast. These contracts represent underpriced options where volatility expansion is imminent, identifying candidates for long debit spreads, straddles, or calendar spreads.
 \end{enumerate}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}{0.48\textwidth}
         \centering
@@ -221,7 +227,7 @@ The analysis examines a representative near-the-money weekly call option:
 
 Figures \ref{fig:spot_stress_sensitivity} and \ref{fig:iv_stress_sensitivity} present the sensitivity response curves across spot price and implied volatility shifts, respectively.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \begin{minipage}{0.48\textwidth}
         \centering
