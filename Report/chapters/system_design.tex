@@ -8,51 +8,217 @@ To forecast high-frequency implied volatility changes and evaluate relative opti
 
 Figure \ref{fig:system_architecture_tikz} presents the architectural layout and information flow across all system modules.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
+    \resizebox{\textwidth}{!}{%
     \begin{tikzpicture}[
-        node distance=0.9cm and 0.5cm,
-        box/.style={rectangle, draw=black, thick, fill=blue!5, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
-        store/.style={cylinder, draw=black, thick, fill=orange!10, shape border rotate=90, aspect=0.25, minimum height=0.85cm, minimum width=2.2cm, text centered, align=center, text width=2.3cm, font=\scriptsize},
-        proc/.style={rectangle, draw=black, thick, fill=green!8, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
-        model/.style={rectangle, draw=black, thick, fill=purple!8, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
-        eval/.style={rectangle, draw=black, thick, fill=yellow!15, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
-        arrow/.style={-{Latex[length=2.2mm]}, thick}
+        font=\sffamily\footnotesize,
+        % Standard Pipeline Node
+        box/.style={
+            rectangle,
+            rounded corners=5pt,
+            line width=0.85pt,
+            align=center,
+            text=slatetext,
+            minimum width=3.55cm,
+            minimum height=1.1cm,
+            inner xsep=8pt,
+            inner ysep=6pt,
+            drop shadow={
+                shadow xshift=0pt,
+                shadow yshift=-1.5pt,
+                opacity=0.08,
+                fill=black
+            }
+        },
+        % Benchmark / Baseline Node (subtle dashed border)
+        baselinebox/.style={
+            box,
+            densely dashed,
+            dash pattern=on 3.5pt off 2pt
+        },
+        % Cylinder Storage Node
+        datastore/.style={
+            cylinder,
+            shape border rotate=90,
+            aspect=0.20,
+            line width=0.85pt,
+            draw=amberBorder,
+            fill=amberFill,
+            align=center,
+            text=slatetext,
+            minimum width=2.85cm,
+            minimum height=1.35cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={
+                shadow xshift=0pt,
+                shadow yshift=-1.5pt,
+                opacity=0.08,
+                fill=black
+            }
+        },
+        % Stage Container Card
+        stagebox/.style={
+            rectangle,
+            rounded corners=8pt,
+            fill=slatebg,
+            draw=slateborder,
+            line width=0.6pt,
+            inner xsep=11pt,
+            inner ysep=10pt
+        },
+        % Stage Header Pill
+        stageheader/.style={
+            font=\sffamily\scriptsize\bfseries,
+            text=subtext,
+            align=center
+        },
+        % Smooth Orthogonal Arrows
+        flow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=linecolor,
+            rounded corners=4pt
+        },
+        % Branch Junction Dot
+        junction/.style={
+            circle,
+            fill=linecolor,
+            inner sep=1.4pt
+        }
     ]
-        % Column 1: Ingestion & Storage
-        \node (api) [box] {\textbf{Upstox API v2}\\(NSE NIFTY 50 Chain)};
-        \node (sync) [box, below=0.7cm of api] {\textbf{5-Min Wall-Clock}\\Synchronizer (300s)};
-        \node (raw) [store, below=0.7cm of sync] {\textbf{Raw Snapshot Store}\\\textit{data/raw/*.csv}};
 
-        % Column 2: Sanitation & Feature Engineering
-        \node (clean) [proc, right=1.0cm of api] {\textbf{Data Sanitation}\\Zero IV \& Spread QC};
-        \node (geom) [proc, below=0.7cm of clean] {\textbf{Moneyness Filtering}\\$0.95 \le K/S \le 1.05$};
-        \node (feat) [proc, below=0.7cm of geom] {\textbf{Feature Engineering}\\Exact TTE \& Lags};
+    % =========================================================
+    % COLUMN 1: DATA INGESTION & STORAGE
+    % =========================================================
+    \node[box, fill=indigoFill, draw=indigoBorder] (upstox) at (0, 0) {
+        \textbf{Upstox API v2}\\[2pt]
+        {\scriptsize\color{subtext} NSE NIFTY 50 Option Chain}
+    };
 
-        % Column 3: Split & Modeling
-        \node (split) [eval, right=1.0cm of clean] {\textbf{Chronological Split}\\Strict Out-of-Sample};
-        \node (rf) [model, below=0.7cm of split] {\textbf{Random Forest}\\Ensemble + Lags};
-        \node (base) [model, below=0.7cm of rf] {\textbf{Persistence Baseline}\\$\widehat{\Delta \text{IV}}_{t+5} = 0$};
+    \node[box, fill=indigoFill, draw=indigoBorder, below=0.85cm of upstox] (wallclock) {
+        \textbf{5-Min Wall-Clock}\\[2pt]
+        {\scriptsize\color{subtext} Synchronizer (300s)}
+    };
 
-        % Column 4: Valuation & Deployment
-        \node (conv) [eval, right=1.0cm of split] {\textbf{Conviction Gating}\\$|\widehat{\Delta \text{IV}}| \ge \theta$};
-        \node (relval) [eval, below=0.7cm of conv] {\textbf{Relative Valuation}\\Fair / Rich / Cheap};
-        \node (deploy) [box, below=0.7cm of relval] {\textbf{Live Daemon \& UI}\\Streamlit Dashboard};
+    \node[datastore, below=0.82cm of wallclock] (store) {
+        \textbf{Raw Snapshot Store}\\[2pt]
+        {\scriptsize\color{subtext}\texttt{data/raw/*.csv}}
+    };
 
-        % Connecting Arrows
-        \draw [arrow] (api) -- (sync);
-        \draw [arrow] (sync) -- (raw);
-        \draw [arrow] (raw.east) -- ++(0.3,0) |- (clean.west);
-        \draw [arrow] (clean) -- (geom);
-        \draw [arrow] (geom) -- (feat);
-        \draw [arrow] (feat.east) -- ++(0.3,0) |- (split.west);
-        \draw [arrow] (split) -- (rf);
-        \draw [arrow] (split) -- (base);
-        \draw [arrow] (rf) -- (conv);
-        \draw [arrow] (conv) -- (relval);
-        \draw [arrow] (relval) -- (deploy);
-    \end{tikzpicture}
+    \node[stageheader, above=0.35cm of upstox] (h1) {1. INGESTION \& STORAGE};
+
+    % =========================================================
+    % COLUMN 2: PREPROCESSING & FEATURE ENGINEERING
+    % =========================================================
+    \node[box, fill=emeraldFill, draw=emeraldBorder, right=1.45cm of upstox] (sanitation) {
+        \textbf{Data Sanitation}\\[2pt]
+        {\scriptsize\color{subtext} Zero IV \& Spread QC}
+    };
+
+    \node[box, fill=emeraldFill, draw=emeraldBorder, below=0.85cm of sanitation] (moneyness) {
+        \textbf{Moneyness Filtering}\\[2pt]
+        {\scriptsize\color{subtext} $0.95 \le K/S \le 1.05$}
+    };
+
+    \node[box, fill=emeraldFill, draw=emeraldBorder, below=0.85cm of moneyness] (features) {
+        \textbf{Feature Engineering}\\[2pt]
+        {\scriptsize\color{subtext} Exact TTE \& Lags}
+    };
+
+    \node[stageheader, above=0.35cm of sanitation] (h2) {2. PREPROCESSING};
+
+    % =========================================================
+    % COLUMN 3: VALIDATION & MODELING
+    % =========================================================
+    \node[box, fill=amberFill, draw=amberBorder, right=1.45cm of sanitation] (split) {
+        \textbf{Chronological Split}\\[2pt]
+        {\scriptsize\color{subtext} Strict Out-of-Sample}
+    };
+
+    \node[box, fill=violetFill, draw=violetBorder, below=0.85cm of split] (rf) {
+        \textbf{Random Forest}\\[2pt]
+        {\scriptsize\color{subtext} Ensemble + Lags}
+    };
+
+    \node[baselinebox, fill=violetFill, draw=violetBorder, below=0.85cm of rf] (baseline) {
+        \textbf{Persistence Baseline}\\[2pt]
+        {\scriptsize\color{subtext} $\widehat{\Delta\mathrm{IV}}_{t+5} = 0$ \;{\tiny(Benchmark)}}
+    };
+
+    \node[stageheader, above=0.35cm of split] (h3) {3. MODELING};
+
+    % =========================================================
+    % COLUMN 4: DECISION LOGIC & DEPLOYMENT
+    % =========================================================
+    \node[box, fill=amberFill, draw=amberBorder, right=1.45cm of split] (gating) {
+        \textbf{Conviction Gating}\\[2pt]
+        {\scriptsize\color{subtext} $|\widehat{\Delta\mathrm{IV}}| \ge \theta$}
+    };
+
+    \node[box, fill=amberFill, draw=amberBorder, below=0.85cm of gating] (valuation) {
+        \textbf{Relative Valuation}\\[2pt]
+        {\scriptsize\color{subtext} Fair / Rich / Cheap}
+    };
+
+    \node[box, fill=skyFill, draw=skyBorder, below=0.85cm of valuation] (daemon) {
+        \textbf{Live Daemon \& UI}\\[2pt]
+        {\scriptsize\color{subtext} Streamlit Dashboard}
+    };
+
+    \node[stageheader, above=0.35cm of gating] (h4) {4. EXECUTION \& UI};
+
+    % =========================================================
+    % ROUTING & ALIGNMENT COORDINATES
+    % =========================================================
+    \coordinate (fork) at ([yshift=-0.38cm]split.south);
+    \coordinate (busleft) at ([xshift=-0.48cm]rf.west);
+    \coordinate (bottomref) at (store.south);
+
+    % =========================================================
+    % BACKGROUND STAGE CONTAINERS (EQUAL HEIGHTS)
+    % =========================================================
+    \begin{scope}[on background layer]
+        \node[stagebox, fit=(h1)(upstox)(store)(upstox |- bottomref)] {};
+        \node[stagebox, fit=(h2)(sanitation)(features)(sanitation |- bottomref)] {};
+        \node[stagebox, fit=(h3)(split)(baseline)(busleft)(split |- bottomref)] {};
+        \node[stagebox, fit=(h4)(gating)(daemon)(gating |- bottomref)] {};
+    \end{scope}
+
+    % =========================================================
+    % CONNECTING ARROWS
+    % =========================================================
+    % Column 1 -> Column 2 (exact gutter midpoint)
+    \draw[flow] (upstox.south) -- (wallclock.north);
+    \draw[flow] (wallclock.south) -- (store.north);
+    \coordinate (mid12) at ($(upstox.east)!0.5!(sanitation.west)$);
+    \draw[flow] (store.east) -| (mid12 |- sanitation.west) -- (sanitation.west);
+
+    % Column 2 -> Column 3 (exact gutter midpoint)
+    \draw[flow] (sanitation.south) -- (moneyness.north);
+    \draw[flow] (moneyness.south) -- (features.north);
+    \coordinate (mid23) at ($(features.east)!0.5!(split.west)$);
+    \draw[flow] (features.east) -| (mid23 |- split.west) -- (split.west);
+
+    % Column 3 Clean Fork -> Random Forest & Persistence Baseline
+    \draw[line width=0.95pt, draw=linecolor] (split.south) -- (fork);
+    \node[junction] at (fork) {};
+    \draw[flow] (fork) -- (rf.north);
+    \draw[flow] (fork) -| (busleft |- baseline.west) -- (baseline.west);
+
+    % Column 3 -> Column 4 (exact gutter midpoint)
+    \coordinate (mid34) at ($(rf.east)!0.5!(gating.west)$);
+    \draw[flow] (rf.east) -| (mid34 |- gating.west) -- (gating.west);
+
+    % Column 4 vertical flow
+    \draw[flow] (gating.south) -- (valuation.north);
+    \draw[flow] (valuation.south) -- (daemon.north);
+
+    \end{tikzpicture}%
+    }
     \caption{End-to-End System Pipeline and Quantitative Data Flow Architecture.}
+    \label{fig:pipeline_architecture}
     \label{fig:system_architecture_tikz}
 \end{figure}
 
