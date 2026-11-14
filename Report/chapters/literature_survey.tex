@@ -17,7 +17,7 @@ where $S_t$ is the spot price of the underlying asset, $r$ is the continuously c
 \end{equation}
 
 The model relies on several simplifying market assumptions:
-\begin{itemize}
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Geometric Brownian Motion:} Asset prices follow continuous diffusion with constant drift and constant return volatility $\sigma$.
     \item \textbf{Frictionless Electronic Markets:} Zero transaction costs, zero bid-ask spread friction, and unrestricted short-selling.
     \item \textbf{Continuous Trading:} Portfolios can be continuously rebalanced at infinitesimal intervals without price slippage or market impact.
@@ -34,10 +34,10 @@ In live options markets, volatility $\sigma$ is an unobservable parameter. Trade
 \end{equation}
 
 If the BSM model reflected reality perfectly, inverting the formula across different strikes $K$ and expiration dates $T$ would yield a constant volatility plane. However, empirical option markets exhibit distinct structural variations across strike and maturity, giving rise to the 3D \textbf{Implied Volatility Surface}:
-\begin{itemize}
-    \item \textbf{Pronounced Negative Skew:} Out-of-the-money (OTM) put options (low strikes, $K < S$) trade at significantly higher implied volatilities than out-of-the-money call options. This asymmetry reflects strong institutional demand for downside portfolio catastrophe insurance (known as "crashophobia") as well as corporate financial leverage effects.
-    \item \textbf{Smile Curvature (Convexity):} Out-of-the-money and deep in-the-money wings exhibit elevated implied volatility relative to at-the-money (ATM) contracts, reflecting market pricing of fat-tailed (leptokurtic) return distributions.
-    \item \textbf{Term Structure of Volatility:} Implied volatility varies systematically with time-to-expiry. In calm market regimes, the curve slopes gently upward (contango), whereas during sudden market panics, short-term implied volatility spikes sharply above longer-dated contracts (backwardation).
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+    \item \textbf{Pronounced Negative Skew:} Out-of-the-money (OTM) put options (low strikes, $K < S$) trade at significantly higher implied volatilities than out-of-the-money call options, reflecting downside portfolio insurance demand ("crashophobia") and corporate leverage.
+    \item \textbf{Smile Curvature (Convexity):} OTM and deep ITM wings exhibit elevated implied volatility relative to at-the-money (ATM) contracts, pricing fat-tailed return distributions.
+    \item \textbf{Term Structure of Volatility:} Implied volatility varies systematically with time-to-expiry, sloping upward in calm regimes (contango) and spiking during market stress (backwardation).
 \end{itemize}
 
 To resolve the volatility smile, continuous-time finance introduced \textbf{Local Volatility} models (Dupire, 1994; Derman and Kani \cite{derman1994riding}) and \textbf{Stochastic Volatility} models (most notably Heston \cite{heston1993closed}). While stochastic volatility allows volatility itself to follow a mean-reverting random process correlated with the underlying spot price, these continuous-time models require intensive computational recalibration and cannot directly incorporate discrete limit order book microstructure features.
@@ -53,7 +53,7 @@ While ARCH, GARCH, and Realized Volatility capture volatility clustering and per
 \label{sec:ml_in_derivatives}
 
 Over the past decade, institutional trading firms have increasingly adopted non-parametric machine learning architectures for derivatives modeling \cite{lopez2018advances}. Machine learning provides three distinct advantages over classical econometric models:
-\begin{enumerate}
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Model-Free Flexibility:} Algorithms learn complex volatility dynamics directly from market data without imposing rigid diffusion assumptions.
     \item \textbf{Multi-Dimensional Feature Ingestion:} Ensembles can simultaneously process cross-sectional strike geometry, multi-horizon price momentum, and order-book liquidity metrics.
     \item \textbf{Non-Linear Interaction Capture:} Tree-based models automatically capture non-linear interactions, such as how the impact of order-book spreads on volatility changes depending on whether a contract is at-the-money or deep out-of-the-money.
@@ -71,7 +71,7 @@ In contrast to bagging, **Gradient Boosting** builds trees sequentially in an ad
 Prices on modern electronic exchanges are formed through continuous double-auction mechanisms in \textbf{Limit Order Books (LOB)} \cite{hasbrouck2007empirical, bouchaud2003theory}. At any discrete timestamp $t$, the state of an option contract is defined by standing limit buy orders (bids) and limit sell orders (asks). The \textbf{Bid-Ask Spread} ($\text{Spread}_t = \text{Ask}_t - \text{Bid}_t$) represents the instantaneous cost of liquidity immediacy.
 
 In market microstructure theory, the bid-ask spread reflects three primary operational frictions:
-\begin{itemize}
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Order Processing Costs:} Direct exchange routing, clearing, and regulatory fees incurred by market makers.
     \item \textbf{Inventory Holding Risk:} The risk of holding unhedged options positions during sudden market reversals.
     \item \textbf{Adverse Selection (Informed Trading):} As formulated by Glosten and Milgrom \cite{glosten1985bid}, market makers widen spreads when facing informed counterparties possessing superior information about impending underlying moves or volatility shifts.
@@ -82,7 +82,7 @@ In intraday options trading, sudden spread widening frequently precedes sharp ad
 \label{sec:research_gap}
 
 A review of the derivatives literature highlights four critical gaps that this study directly addresses:
-\begin{enumerate}
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Scarcity of Ultra-High-Frequency (5-Minute) IV Studies:} Most published volatility literature focuses on daily or monthly horizons; empirical models forecasting 5-minute implied volatility changes across cross-sectional option chains in emerging markets remain exceptionally rare.
     \item \textbf{Unrealistic Benchmark Evaluations:} Academic papers frequently evaluate machine learning models using randomized cross-validation that leaks future temporal data, and rarely benchmark against the formidable **Persistence Random Walk** ($\widehat{\Delta \text{IV}}_{t+5} = 0$).
     \item \textbf{Lack of Operational Valuation Translation:} Machine learning studies often terminate at statistical error metrics (MAE/RMSE) without converting predictions into economic signals (such as relative valuation screeners or scenario stress grids).

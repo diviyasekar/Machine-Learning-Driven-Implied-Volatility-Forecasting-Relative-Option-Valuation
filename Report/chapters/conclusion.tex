@@ -59,11 +59,11 @@ Desks must establish a strict risk rule: **automatically deactivate machine-lear
 \label{sec:limitations}
 
 While empirical results demonstrate robust predictive performance, several academic and operational limitations should be acknowledged:
-\begin{enumerate}
-    \item \textbf{Temporal Sample Window:} The primary development and validation data were harvested across weekly expiry cycles in October 2026. While capturing both normal mid-week and extreme expiry-day conditions, long-term multi-year backtesting across bull markets, bear crashes, and high-volatility regimes would provide broader macroeconomic generalization.
-    \item \textbf{Strike Geometry Restriction:} The study focused on liquid near-ATM options ($0.95 \le K/S \le 1.05$). Deep out-of-the-money options (which carry tail-risk pricing information) were excluded to avoid quoting noise, leaving deep-wing dynamics unmodeled.
-    \item \textbf{Sampling Frequency:} The dataset utilizes regularized 5-minute snapshots. While optimal for algorithmic intraday swing positioning and quote shading, sub-second HFT desks require tick-by-tick order-book depth (Level 3 data) to model millisecond queue dynamics.
-    \item \textbf{Execution Slippage Modeling:} While microstructure spreads were integrated into feature engineering, empirical P\&L backtests did not simulate explicit execution fill queues, market impact costs, or exchange connectivity latency.
+\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
+    \item \textbf{Temporal Sample Window:} The dataset covers weekly expiry cycles in October 2026. Long-term multi-year backtesting across bull markets, bear regimes, and high-volatility macro crises would provide broader longitudinal generalization.
+    \item \textbf{Strike Geometry Restriction:} The study focused on liquid near-ATM options ($0.95 \le K/S \le 1.05$). Deep out-of-the-money wings (carrying extreme tail-risk information) were excluded to avoid quote illiquidity noise.
+    \item \textbf{Sampling Frequency:} Regularized 5-minute snapshots were analyzed. While optimal for algorithmic intraday positioning and quote shading, sub-second HFT desks require tick-by-tick order-book depth to model millisecond queue dynamics.
+    \item \textbf{Execution Slippage Modeling:} While microstructure spreads were integrated into feature engineering, live P\&L backtests did not simulate explicit execution queue positions or exchange connectivity latency.
 \end{enumerate}
 
 \section{Directions for Future Quantitative Research}
@@ -71,13 +71,9 @@ While empirical results demonstrate robust predictive performance, several acade
 
 The findings and infrastructure established in this thesis suggest several promising pathways for future academic and industry research:
 
-\begin{enumerate}
-    \item \textbf{Deep Sequential Architectures \& Attention Mechanisms:}
-    Future iterations could explore deep sequence models—such as **Temporal Fusion Transformers (TFT)** or Bidirectional LSTM networks with self-attention—trained on rolling multi-hour sequences of tick-level order book messages to capture long-range temporal dependencies.
-    \item \textbf{Explicit Markov-Switching Regime Models:}
-    To resolve the expiry collapse, future research should develop a **Markov-Switching Vector Autoregressive (MS-VAR)** or Hidden Markov Model framework that models the continuous transition between the Normal Trading Regime ($T > 6\text{h}$) and the Hyper-Gamma Expiry Regime ($T < 2\text{h}$) as an endogenous latent state process.
-    \item \textbf{Cross-Asset Volatility Spillover Networks:}
-    Expanding the feature space to include cross-asset signals—such as BankNIFTY implied volatility, the National Stock Exchange's **India VIX**, USD/INR currency option volatility, and overnight US S\&P 500 VIX movements—would capture macro risk contagion across correlated financial markets.
-    \item \textbf{Reinforcement Learning for Automated Delta-Vega Hedging:}
-    Rather than utilizing static heuristic trading rules, future work could train a Deep Q-Network (DQN) or Proximal Policy Optimization (PPO) reinforcement learning agent that dynamically adjusts options portfolio delta and vega hedges conditioned on live model predictions, optimizing for risk-adjusted Sharpe and Sortino ratios under realistic transaction friction.
+\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
+    \item \textbf{Deep Sequential Architectures \& Attention Mechanisms:} Future iterations could explore deep sequence models—such as Temporal Fusion Transformers (TFT) or Bidirectional LSTM networks with self-attention—trained on rolling sequences of order-book messages to capture long-range dependencies.
+    \item \textbf{Explicit Markov-Switching Regime Models:} To resolve the expiry collapse, future research should develop a Markov-Switching Vector Autoregressive (MS-VAR) framework that models the continuous transition between the Normal Trading Regime ($T > 6\text{h}$) and the Hyper-Gamma Expiry Regime ($T < 2\text{h}$) as an endogenous latent state.
+    \item \textbf{Cross-Asset Volatility Spillover Networks:} Expanding the feature space to include cross-asset signals—such as BankNIFTY implied volatility, India VIX, USD/INR currency option volatility, and overnight US S\&P 500 VIX movements—would capture macro risk contagion across correlated financial markets.
+    \item \textbf{Reinforcement Learning for Automated Delta-Vega Hedging:} Rather than utilizing static heuristic trading rules, future work could train a Deep Q-Network (DQN) or Proximal Policy Optimization (PPO) agent that dynamically adjusts portfolio delta and vega hedges conditioned on live model predictions under realistic transaction friction.
 \end{enumerate}

@@ -79,22 +79,22 @@ In pursuing these objectives, four quantitative hypotheses are formally tested:
 The empirical analysis is conducted on high-frequency snapshot data of NIFTY 50 European index options. The development and out-of-sample validation datasets comprise snapshots collected during normal trading sessions (October 15--16, 2026), representing contracts with between 74.6 and 100.6 hours remaining until weekly expiry. The robustness dataset comprises unseen snapshots harvested during the final hours of the October 19, 2026 expiry session (0.17 to 1.58 hours to expiry).
 
 The analytical framework adheres strictly to quantitative finance best practices:
-\begin{itemize}
-    \item \textbf{No Look-Ahead Bias:} Temporal ordering is strictly preserved. Lagged features are generated strictly from historical past records ($t-5$, $t-10$). Train and test splits are partitioned strictly by timestamp cutoff rather than random shuffling.
-    \item \textbf{Microstructure Realism:} Rather than assuming friction-free mid-prices, bid-ask spreads and liquidity constraints are directly embedded in feature engineering and model evaluation.
-    \item \textbf{Economic Interpretability:} All machine learning forecasts are directly mapped to closed-form Black-Scholes derivatives pricing and operational trading strategies.
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+    \item \textbf{No Look-Ahead Bias:} Temporal ordering is strictly preserved. Lags are derived strictly from historical past records ($t-5$, $t-10$), and splits are partitioned chronologically by timestamp.
+    \item \textbf{Microstructure Realism:} Bid-ask spreads and liquidity constraints are directly embedded in feature engineering and model evaluation rather than assuming frictionless mid-prices.
+    \item \textbf{Economic Interpretability:} All machine learning forecasts are mapped directly to closed-form Black-Scholes pricing and operational relative valuation screeners.
 \end{itemize}
 
 \section{Organization of the Thesis}
 \label{sec:thesis_organization}
 
 The remainder of this report is organized as follows:
-\begin{itemize}
-    \item \textbf{Chapter \ref{chap:literature_survey}} reviews theoretical foundations of option pricing, Black-Scholes-Merton assumptions, the economics of implied volatility surfaces, and modern applications of machine learning in derivatives finance.
-    \item \textbf{Chapter \ref{chap:system_design}} outlines the overall system architecture, automated Upstox API ingestion pipeline, data cleaning rules, exact fractional TTE formulation, and temporal feature engineering.
-    \item \textbf{Chapter \ref{chap:algorithms}} provides exhaustive mathematical derivations of Black-Scholes Greeks, the Newton-Raphson implied volatility inversion algorithm, machine learning formulations, conviction thresholding mechanics, and scenario stress matrices.
-    \item \textbf{Chapter \ref{chap:implementation}} details the software architecture, production feature serialization, the 5-minute automated live prediction daemon, and the multi-page institutional Streamlit dashboard interface.
-    \item \textbf{Chapter \ref{chap:results}} presents empirical benchmarks against the persistence and OLS models, Gini feature importance findings, conviction threshold results, relative valuation distributions, multi-factor stress tests, and the econometric analysis of the October 19 expiry-day regime breakdown.
-    \item \textbf{Chapter \ref{chap:conclusion}} synthesizes key academic and practical findings, discusses desk trading implications for Surabhi Investment Services, addresses study limitations, and proposes directions for future quantitative research.
-    \item \textbf{Appendices} provide formal mathematical derivations of higher-order Greeks, the complete 39-feature schema specification, and core algorithmic source code modules.
+\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+    \item \textbf{Chapter \ref{chap:literature_survey}} reviews option pricing theory, BSM assumptions, implied volatility surface geometry, and machine learning applications in derivatives.
+    \item \textbf{Chapter \ref{chap:system_design}} details system taxonomy, Upstox API ingestion, data sanitation, exact fractional TTE engineering, and feature pipelines.
+    \item \textbf{Chapter \ref{chap:algorithms}} details the institutional Greeks framework, carry equilibria, the Newton-Raphson solver, and predictive model formulations.
+    \item \textbf{Chapter \ref{chap:implementation}} details software engineering architecture, live daemon execution, and the institutional multi-page Streamlit dashboard.
+    \item \textbf{Chapter \ref{chap:results}} presents empirical benchmarks against persistence, impurity importance, conviction thresholding, stress testing, and the expiry breakdown.
+    \item \textbf{Chapter \ref{chap:conclusion}} synthesizes findings, provides operational recommendations for trading desks, outlines limitations, and identifies future scope.
+    \item \textbf{Appendices} provide the complete 39-feature schema specification and core algorithmic Python source modules.
 \end{itemize}

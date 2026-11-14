@@ -343,36 +343,12 @@ On weekly index options, Theta decay does not occur in daily steps; it bleeds co
 To equip the predictive models with temporal memory without violating causality, the feature engineering pipeline constructs multi-horizon autoregressive lags and momentum indicators. Each contract is uniquely indexed by the composite key $(K, \text{option\_type})$. For each discrete time step $t$, the state vector incorporates historical information from prior intervals $t-5$ and $t-10$ minutes.
 
 The engineered feature space spans five functional categories:
-\begin{enumerate}
-    \item \textbf{Strike Geometry \& Relative Moneyness:}
-    \begin{equation}
-        \text{moneyness} = \frac{K}{S_t}, \quad \text{log\_moneyness} = \ln\left(\frac{S_t}{K}\right)
-    \end{equation}
-    \textit{Intuition:} Normalizes strike location across varying index levels, allowing models to learn invariant volatility smile curvature.
-
-    \item \textbf{Continuous Temporal Variables:}
-    \begin{equation}
-        \text{exact\_tte\_hours} = \text{TTE}_{\text{hours}}(t)
-    \end{equation}
-    \textit{Intuition:} Supplies the regression trees with the physical time coordinate to price non-linear decay.
-
-    \item \textbf{Autoregressive Volatility Memory:}
-    \begin{equation}
-        \text{IV}_t = \sigma_{\text{market}}(t), \quad \text{IV}_{\text{lag}\_5m} = \sigma_{\text{market}}(t-5), \quad \text{IV}_{\text{lag}\_10m} = \sigma_{\text{market}}(t-10)
-    \end{equation}
-    \textit{Intuition:} Captures the short-term persistence and autocorrelation of implied volatility states.
-
-    \item \textbf{Volatility Momentum \& Velocity:}
-    \begin{equation}
-        \text{IV\_change\_prev\_5m} = \text{IV}_t - \text{IV}_{\text{lag}\_5m}, \quad \text{IV\_change\_prev\_10m} = \text{IV}_t - \text{IV}_{\text{lag}\_10m}
-    \end{equation}
-    \textit{Intuition:} Measures the instantaneous velocity of volatility expansions or contractions. As revealed in empirical testing, this feature dominates static strike characteristics.
-
-    \item \textbf{Market Microstructure \& Order Book Liquidity:}
-    \begin{equation}
-        \text{bid\_ask\_spread} = \text{Ask}_t - \text{Bid}_t, \quad \text{spread\_ratio} = \frac{\text{Ask}_t - \text{Bid}_t}{\text{LTP}_t}, \quad \Delta \text{spot}_{5m} = S_t - S_{t-5}
-    \end{equation}
-    \textit{Intuition:} Proxies dealer inventory distress and adverse selection; sudden spread widening signals impending volatility jumps.
+\begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+    \item \textbf{Strike Geometry \& Relative Moneyness:} $\text{moneyness} = K / S_t$, $\text{log\_moneyness} = \ln(S_t / K)$, allowing models to learn invariant volatility smile curvature across shifting underlying price levels.
+    \item \textbf{Continuous Temporal Variables:} $\text{exact\_tte\_hours} = \text{TTE}_{\text{hours}}(t)$, supplying regression trees with the exact physical time coordinate to price non-linear extrinsic time decay.
+    \item \textbf{Autoregressive Volatility Memory:} Multi-horizon market volatility lags ($\sigma_t, \sigma_{t-5\text{m}}, \sigma_{t-10\text{m}}$) capturing short-term persistence and volatility state autocorrelation.
+    \item \textbf{Volatility Momentum \& Velocity:} Instantaneous volatility velocity ($\text{IV}_t - \text{IV}_{t-5\text{m}}$ and $\text{IV}_t - \text{IV}_{t-10\text{m}}$) reflecting rapid volatility expansion or crush.
+    \item \textbf{Market Microstructure \& Liquidity:} Absolute Bid-Ask Spread ($\text{Ask}_t - \text{Bid}_t$), percentage spread, and spot momentum ($\Delta \text{spot}_{5\text{m}}$) capturing dealer inventory distress and adverse selection.
 \end{enumerate}
 
 Table \ref{tab:master_feature_catalog} summarizes the primary mathematical feature catalog deployed in the predictive engine.

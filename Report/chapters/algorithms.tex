@@ -80,25 +80,239 @@ Newton-Raphson updates volatility estimates by dividing the price error by Vega:
     \item \textbf{Numerical Divergence Trap:} When contracts approach expiration ($\tau \to 0$), Vega collapses toward zero ($\nu \to 0$). Dividing by near-zero causes standard Newton-Raphson to diverge wildly. The production engine implements lower bounds on Vega ($\nu > 10^{-7}$) and falls back to bounded Brent bisection during near-expiry sessions.
 \end{itemize}
 
-Algorithm \ref{alg:newton_raphson_iv} presents the production numerical inversion routine.
+Figure \ref{fig:nr_iv_flowchart} presents the control flow, numerical convergence checks, and safeguard mechanisms of the production Newton-Raphson inversion routine (Algorithm 1).
 
-\begin{algorithm}[H]
-\caption{Newton-Raphson Implied Volatility Numerical Inversion}
-\label{alg:newton_raphson_iv}
-\begin{algorithmic}[1]
-\Require Spot $S$, Strike $K$, Expiry $\tau$, Rate $r$, Price $C_{\text{market}}$, Tol $\epsilon = 10^{-6}$, Max Iter $N_{\max} = 100$
-\Ensure Implied Volatility $\sigma_{\text{implied}}$
-\State \textbf{if} $C_{\text{market}} < \max(0, S - K e^{-r\tau})$ \textbf{then return} $\text{NaN}$ \Comment{Check intrinsic boundary}
-\State Initialize: $\sigma_0 \gets \sqrt{2\pi / \tau} \cdot (C_{\text{market}} / S)$ \Comment{Brenner-Subrahmanyam seed}
-\For{$n = 0$ \textbf{to} $N_{\max}$}
-    \State Compute $C_{\text{model}} \gets \text{BSM\_Call}(S, K, \tau, r, \sigma_n)$; error $\Delta C \gets C_{\text{model}} - C_{\text{market}}$
-    \State \textbf{if} $|\Delta C| < \epsilon$ \textbf{then return} $\sigma_n$ \Comment{Convergence achieved}
-    \State Compute Vega $\nu \gets S \sqrt{\tau} N'(d_1)$; \textbf{if} $\nu < 10^{-7}$ \textbf{then} fall back to Brent bisection
-    \State $\sigma_{n+1} \gets \sigma_n - \Delta C / \nu$ \Comment{Newton-Raphson update}
-\EndFor
-\State \Return $\sigma_{N_{\max}}$
-\end{algorithmic}
-\end{algorithm}
+\begin{figure}[htbp]
+    \centering
+    \resizebox{0.86\textwidth}{!}{%
+    \begin{tikzpicture}[
+        font=\sffamily\footnotesize,
+        % Start / Terminal Pill
+        terminal/.style={
+            rectangle,
+            rounded corners=13pt,
+            line width=0.9pt,
+            align=center,
+            text=slatetext,
+            text width=5.6cm,
+            minimum width=6.0cm,
+            minimum height=0.98cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        % Right-Side Exit Pill
+        exitbox/.style={
+            rectangle,
+            rounded corners=13pt,
+            line width=0.9pt,
+            align=center,
+            text=slatetext,
+            text width=4.35cm,
+            minimum width=4.65cm,
+            minimum height=0.95cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        % Main Process Node
+        procbox/.style={
+            rectangle,
+            rounded corners=5pt,
+            line width=0.85pt,
+            align=center,
+            text=slatetext,
+            text width=5.6cm,
+            minimum width=6.0cm,
+            minimum height=0.96cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        % Decision Diamond
+        decision/.style={
+            diamond,
+            aspect=2.35,
+            line width=0.85pt,
+            draw=amberBorder,
+            fill=amberFill,
+            align=center,
+            text=slatetext,
+            inner xsep=5pt,
+            inner ysep=2pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        % Dashed Loop Container
+        loopframe/.style={
+            rectangle,
+            rounded corners=8pt,
+            fill=slatebg,
+            draw=slateborder,
+            densely dashed,
+            line width=0.8pt,
+            inner xsep=11pt,
+            inner ysep=10pt
+        },
+        % Flow Arrows
+        flow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=linecolor,
+            rounded corners=4pt
+        },
+        errflow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=roseBorder,
+            rounded corners=4pt
+        },
+        okflow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=emeraldBorder,
+            rounded corners=4pt
+        },
+        junction/.style={
+            circle,
+            fill=linecolor,
+            inner sep=1.4pt
+        },
+        lbl/.style={
+            font=\sffamily\scriptsize\bfseries,
+            text=subtext
+        }
+    ]
+
+    % =========================================================
+    % MAIN VERTICAL FLOW
+    % =========================================================
+    \node[terminal, fill=indigoFill, draw=indigoBorder] (start) at (0, 0) {
+        \textbf{Start: Newton-Raphson IV Solver}\\[1.5pt]
+        {\scriptsize\color{subtext} Require: $S, K, \tau, r, C_{\text{market}}$; \;$\epsilon = 10^{-6}$, $N_{\max} = 100$}
+    };
+
+    \node[decision, below=0.58cm of start] (intrinsic) {
+        \textbf{Intrinsic Boundary?}\\[-1pt]
+        {\scriptsize\color{subtext} $C_{\text{market}} < \max(0, S - K e^{-r\tau})$}
+    };
+
+    \node[procbox, fill=indigoFill, draw=indigoBorder, below=0.68cm of intrinsic] (init) {
+        \textbf{Initialize Seed \& Iteration Counter}\\[1.5pt]
+        {\scriptsize\color{subtext} $\sigma_0 \leftarrow \sqrt{2\pi/\tau} \cdot (C_{\text{market}}/S)$ \;(Brenner-Subrahmanyam); \;$n \leftarrow 0$}
+    };
+
+    \node[decision, below=1.15cm of init] (itercheck) {
+        \textbf{Max Iterations?}\\[-1pt]
+        {\scriptsize\color{subtext} $n > N_{\max}$}
+    };
+
+    \node[procbox, fill=emeraldFill, draw=emeraldBorder, below=0.68cm of itercheck] (bsm) {
+        \textbf{Evaluate BSM Model Price \& Error}\\[1.5pt]
+        {\scriptsize\color{subtext} $C_{\text{model}} \leftarrow \mathrm{BSM\_Call}(S, K, \tau, r, \sigma_n)$; \;$\Delta C \leftarrow C_{\text{model}} - C_{\text{market}}$}
+    };
+
+    \node[decision, below=0.58cm of bsm] (convcheck) {
+        \textbf{Converged?}\\[-1pt]
+        {\scriptsize\color{subtext} $|\Delta C| < \epsilon$}
+    };
+
+    \node[procbox, fill=violetFill, draw=violetBorder, below=0.68cm of convcheck] (vega) {
+        \textbf{Compute Analytical Vega}\\[1.5pt]
+        {\scriptsize\color{subtext} $\nu \leftarrow S\sqrt{\tau}\,N'(d_1)$}
+    };
+
+    \node[decision, below=0.58cm of vega] (vegacheck) {
+        \textbf{Vega Singularity?}\\[-1pt]
+        {\scriptsize\color{subtext} $\nu < 10^{-7}$}
+    };
+
+    \node[procbox, fill=violetFill, draw=violetBorder, below=0.68cm of vegacheck] (update) {
+        \textbf{Newton-Raphson Step Update}\\[1.5pt]
+        {\scriptsize\color{subtext} $\sigma_{n+1} \leftarrow \sigma_n - \Delta C / \nu$; \;$n \leftarrow n + 1$}
+    };
+
+    % =========================================================
+    % RIGHT-SIDE TERMINAL & FALLBACK EXITS (Shifted to x = 7.65cm)
+    % =========================================================
+    \node[exitbox, fill=roseFill, draw=roseBorder] (retnan) at ([xshift=7.65cm]intrinsic.center) {
+        \textbf{Return \texttt{NaN}}\\[1.5pt]
+        {\scriptsize\color{subtext} Below intrinsic arbitrage bound}
+    };
+
+    \node[exitbox, fill=skyFill, draw=skyBorder] (retmax) at ([xshift=7.65cm]itercheck.center) {
+        \textbf{Return $\sigma_{N_{\max}}$}\\[1.5pt]
+        {\scriptsize\color{subtext} Max iterations ($N_{\max}=100$) reached}
+    };
+
+    \node[exitbox, fill=emeraldFill, draw=emeraldBorder] (retconv) at ([xshift=7.65cm]convcheck.center) {
+        \textbf{Return $\sigma_{\text{implied}} \leftarrow \sigma_n$}\\[1.5pt]
+        {\scriptsize\color{subtext} Convergence achieved ($|\Delta C| < 10^{-6}$)}
+    };
+
+    \node[exitbox, fill=roseFill, draw=roseBorder] (brent) at ([xshift=7.65cm]vegacheck.center) {
+        \textbf{Fallback: Brent Bisection}\\[1.5pt]
+        {\scriptsize\color{subtext} Bracketed numerical root solver}
+    };
+
+    % =========================================================
+    % DASHED ITERATION LOOP CONTAINER & TOP-LEFT LOOP LABEL
+    % =========================================================
+    \coordinate (loop_top) at ($(init.south)!0.48!(itercheck.north)$);
+
+    \begin{scope}[on background layer]
+        \node[loopframe, fit=(itercheck)(bsm)(convcheck)(vega)(vegacheck)(update)] (loopbox) {};
+    \end{scope}
+
+    % Placed cleanly inside the open top-left corner of loopbox (away from vertical arrow)
+    \node[lbl, text=slatetext, anchor=north west] (looplabel) at ([xshift=7pt, yshift=-5pt]loopbox.north west) {\texttt{for n = 0 to N\_max}};
+
+    % =========================================================
+    % CONNECTING ARROWS & NON-OVERLAPPING LABELS
+    % =========================================================
+    \draw[flow] (start.south) -- (intrinsic.north);
+
+    \draw[flow] (intrinsic.south) -- (init.north);
+    \node[lbl, right, xshift=3pt] at ($(intrinsic.south)!0.48!(init.north)$) {No};
+
+    \draw[flow] (init.south) -- (itercheck.north);
+    \node[junction] at (loop_top) {};
+
+    \draw[flow] (itercheck.south) -- (bsm.north);
+    \node[lbl, right, xshift=3pt] at ($(itercheck.south)!0.48!(bsm.north)$) {No};
+
+    \draw[flow] (bsm.south) -- (convcheck.north);
+
+    \draw[flow] (convcheck.south) -- (vega.north);
+    \node[lbl, right, xshift=3pt] at ($(convcheck.south)!0.48!(vega.north)$) {No};
+
+    \draw[flow] (vega.south) -- (vegacheck.north);
+
+    \draw[flow] (vegacheck.south) -- (update.north);
+    \node[lbl, right, xshift=3pt] at ($(vegacheck.south)!0.48!(update.north)$) {No};
+
+    % Right-side exit branches (All "Yes" labels aligned outside loopbox.east)
+    \draw[errflow] (intrinsic.east) -- (retnan.west);
+    \node[lbl, text=roseBorder, above, yshift=1.5pt] at ($(loopbox.east |- intrinsic.east)!0.5!(retnan.west)$) {Yes};
+
+    \draw[flow] (itercheck.east) -- (retmax.west);
+    \node[lbl, above, yshift=1.5pt] at ($(loopbox.east |- itercheck.east)!0.5!(retmax.west)$) {Yes};
+
+    \draw[okflow] (convcheck.east) -- (retconv.west);
+    \node[lbl, text=emeraldBorder, above, yshift=1.5pt] at ($(loopbox.east |- convcheck.east)!0.5!(retconv.west)$) {Yes};
+
+    \draw[errflow] (vegacheck.east) -- (brent.west);
+    \node[lbl, text=roseBorder, above, yshift=1.5pt] at ($(loopbox.east |- vegacheck.east)!0.5!(brent.west)$) {Yes};
+
+    % Left-side iteration return bus
+    \coordinate (leftbus) at ([xshift=-0.85cm]loopbox.west);
+    \draw[flow] (update.west) -- (leftbus |- update.west) |- (loop_top);
+
+    \end{tikzpicture}%
+    }
+    \caption{Control Flow and Numerical Safeguards of the Newton-Raphson Implied Volatility Solver (Algorithm 1).}
+    \label{fig:nr_iv_flowchart}
+    \label{alg:newton_raphson_iv}
+\end{figure}
 
 \section{Predictive Model Formulations}
 \label{sec:predictive_models_math}

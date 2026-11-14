@@ -55,39 +55,227 @@ To guarantee fault-tolerant execution, the production framework implements an im
 
 The automated background execution engine (\texttt{live\_iv\_predictor.py}) is designed for continuous, unattended execution on trading servers. It synchronizes with the NSE 5-minute wall clock, maintains rolling intraday state memory, extracts live features, and dispatches volatility predictions to operational data tables.
 
-Algorithm \ref{alg:live_daemon_flow} outlines the execution flow of the live prediction engine.
+Figure \ref{fig:daemon_flowchart} outlines the control flow, error recovery logic, and continuous execution architecture of the live prediction engine (Algorithm 2).
 
-\begin{algorithm}[H]
-\caption{Automated 5-Minute Live Volatility Prediction Daemon}
-\label{alg:live_daemon_flow}
-\begin{algorithmic}[1]
-\Require Upstox API Token, Serialized Model, Feature Schema, Imputation Medians
-\State Initialize rolling snapshot buffer $\mathcal{B} \gets \emptyset$
-\While{\textbf{true}}
-    \State $t_{\text{now}} \gets \text{EpochTime}()$
-    \State Compute wait interval: $\Delta t_{\text{wait}} \gets 300 - (t_{\text{now}} \pmod{300})$
-    \State Sleep for $\Delta t_{\text{wait}}$ seconds \Comment{Synchronize to exact 5-min wall-clock boundary}
-    \State Check market session: \textbf{if} $t \notin \mathcal{T}_{\text{market}}$ \textbf{then continue}
-    \State \textbf{try:}
-        \State \quad Fetch raw option-chain JSON from Upstox API v2
-        \State \quad Normalize Call (CE) and Put (PE) strikes into tabular dataframe $\mathcal{D}_t$
-        \State \quad Compute exact fractional Time-to-Expiry: $\text{TTE}_{\text{hours}} \gets (T_{\text{expiry}} - t) / 3600$
-        \State \quad Filter zero/negative IV and enforce near-ATM bound: $0.95 \le K/S \le 1.05$
-        \State \quad Append sanitized snapshot $\mathcal{D}_t$ to rolling historical buffer $\mathcal{B}$
-        \State \quad Prune $\mathcal{B}$ to retain only observations within the last 30 minutes
-        \State \quad Construct 5m and 10m autoregressive lags by joining $\mathcal{D}_t$ with $\mathcal{D}_{t-5m}$ and $\mathcal{D}_{t-10m}$
-        \State \quad Compute volatility momentum: $\Delta \text{IV}_{5m} \gets \text{IV}_t - \text{IV}_{t-5m}$
-        \State \quad Align feature columns against schema; impute residual NaNs using saved medians
-        \State \quad Predict future volatility change: $\widehat{\Delta \text{IV}}_{t+5} \gets \text{Model.predict}(\mathbf{X}_t)$
-        \State \quad Compute expected future IV: $\widehat{\text{IV}}_{t+5} \gets \text{IV}_t + \widehat{\Delta \text{IV}}_{t+5}$
-        \State \quad Evaluate Valuation Spread: $\text{Spread}_t \gets \text{IV}_t - \widehat{\text{IV}}_{t+5}$
-        \State \quad Assign economic tags: \textbf{Rich} ($\text{Spread} > 0.50$), \textbf{Cheap} ($\text{Spread} < -0.50$), \textbf{Fair}
-        \State \quad Persist outputs to \texttt{live\_iv\_predictions.csv} and append to execution log
-    \State \textbf{except Exception $E$:}
-        \State \quad Log error timestamp and diagnostic traceback; back off for 15 seconds
-\EndWhile
-\end{algorithmic}
-\end{algorithm}
+\begin{figure}[htbp]
+    \centering
+    \resizebox{0.92\textwidth}{!}{%
+    \begin{tikzpicture}[
+        font=\sffamily\footnotesize,
+        terminal/.style={
+            rectangle,
+            rounded corners=13pt,
+            line width=0.9pt,
+            draw=indigoBorder,
+            fill=indigoFill,
+            align=center,
+            text=slatetext,
+            text width=5.2cm,
+            minimum width=5.6cm,
+            minimum height=0.95cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        ctrlbox/.style={
+            rectangle,
+            rounded corners=5pt,
+            line width=0.85pt,
+            align=center,
+            text=slatetext,
+            text width=5.2cm,
+            minimum width=5.6cm,
+            minimum height=0.95cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        pipebox/.style={
+            rectangle,
+            rounded corners=5pt,
+            line width=0.85pt,
+            align=center,
+            text=slatetext,
+            text width=6.1cm,
+            minimum width=6.5cm,
+            minimum height=0.92cm,
+            inner xsep=6pt,
+            inner ysep=5pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        decision/.style={
+            diamond,
+            aspect=2.35,
+            line width=0.85pt,
+            draw=amberBorder,
+            fill=amberFill,
+            align=center,
+            text=slatetext,
+            inner xsep=5pt,
+            inner ysep=2pt,
+            drop shadow={shadow xshift=0pt, shadow yshift=-1.5pt, opacity=0.08, fill=black}
+        },
+        tryframe/.style={
+            rectangle,
+            rounded corners=8pt,
+            fill=slatebg,
+            draw=slateborder,
+            densely dashed,
+            line width=0.8pt,
+            inner xsep=10pt,
+            inner ysep=9pt
+        },
+        flow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=linecolor,
+            rounded corners=4pt
+        },
+        errflow/.style={
+            -{Stealth[length=2.1mm, width=1.55mm]},
+            line width=0.95pt,
+            draw=roseBorder,
+            rounded corners=4pt
+        },
+        junction/.style={
+            circle,
+            fill=linecolor,
+            inner sep=1.4pt
+        },
+        lbl/.style={
+            font=\sffamily\scriptsize\bfseries,
+            text=subtext
+        }
+    ]
+
+    % =========================================================
+    % LEFT COLUMN: RELATIVE POSITIONING FOR CLEAN ARROW GAPS
+    % =========================================================
+    \node[terminal] (start) at (0, 0) {
+        \textbf{Start Live Prediction Daemon}\\[1.5pt]
+        {\scriptsize\color{subtext} Require: API Token, Model, Schema, Medians}
+    };
+
+    \node[ctrlbox, fill=indigoFill, draw=indigoBorder, below=0.52cm of start] (init) {
+        \textbf{Initialize Rolling Buffer}\\[1.5pt]
+        {\scriptsize\color{subtext} $B \leftarrow \emptyset$}
+    };
+
+    \node[ctrlbox, fill=indigoFill, draw=indigoBorder, below=0.78cm of init] (sync) {
+        \textbf{5-Min Wall-Clock Synchronization}\\[1.5pt]
+        {\scriptsize\color{subtext} $t_{\text{now}} \leftarrow \text{EpochTime}()$; \;$\Delta t_{\text{wait}} \leftarrow 300 - (t_{\text{now}} \pmod{300})$\\[1pt]
+        Sleep for $\Delta t_{\text{wait}}$ seconds}
+    };
+
+    \coordinate (loop_top) at ($(init.south)!0.52!(sync.north)$);
+
+    \node[decision, below=0.55cm of sync] (market) {
+        \textbf{Market Session?}\\[-1pt]
+        {\scriptsize\color{subtext} $t \in T_{\text{market}}$}
+    };
+
+    \node[ctrlbox, fill=roseFill, draw=roseBorder, below=0.80cm of market] (except) {
+        \textbf{Exception Handler (\texttt{except Exception E})}\\[1.5pt]
+        {\scriptsize\color{subtext} Log error timestamp \& diagnostic traceback;\\[1pt]
+        Back off for 15 seconds}
+    };
+
+    % =========================================================
+    % RIGHT COLUMN: TRY BLOCK (CORE INFERENCE PIPELINE)
+    % =========================================================
+    \node[pipebox, fill=emeraldFill, draw=emeraldBorder] (fetch) at (8.45, -0.35) {
+        \textbf{1. Fetch \& Normalize Option Chain}\\[1.5pt]
+        {\scriptsize\color{subtext} Fetch Upstox API v2 JSON; Normalize CE \& PE into $D_t$}
+    };
+
+    \node[pipebox, fill=emeraldFill, draw=emeraldBorder, below=0.38cm of fetch] (filter) {
+        \textbf{2. Sanitize \& Filter Strikes}\\[1.5pt]
+        {\scriptsize\color{subtext} $\mathrm{TTE}_{\text{hours}} \leftarrow (T_{\text{expiry}} - t)/3600$; \;Filter $\mathrm{IV} \le 0$ \& $0.95 \le K/S \le 1.05$}
+    };
+
+    \node[pipebox, fill=emeraldFill, draw=emeraldBorder, below=0.38cm of filter] (buffer) {
+        \textbf{3. Update Rolling Snapshot Buffer}\\[1.5pt]
+        {\scriptsize\color{subtext} Append $D_t$ to $B$; Prune observations older than 30 minutes}
+    };
+
+    \node[pipebox, fill=emeraldFill, draw=emeraldBorder, below=0.38cm of buffer] (features) {
+        \textbf{4. Feature Engineering \& Imputation}\\[1.5pt]
+        {\scriptsize\color{subtext} Join $D_{t-5\text{m}}, D_{t-10\text{m}}$ lags; $\Delta\mathrm{IV}_{5\text{m}} \leftarrow \mathrm{IV}_t - \mathrm{IV}_{t-5\text{m}}$; Impute NaNs}
+    };
+
+    \node[pipebox, fill=violetFill, draw=violetBorder, below=0.38cm of features] (predict) {
+        \textbf{5. Volatility Inference}\\[1.5pt]
+        {\scriptsize\color{subtext} $\Delta\mathrm{IV}_{t+5} \leftarrow \mathrm{Model.predict}(X_t)$; \;$\mathrm{IV}_{t+5} \leftarrow \mathrm{IV}_t + \Delta\mathrm{IV}_{t+5}$}
+    };
+
+    \node[pipebox, fill=amberFill, draw=amberBorder, below=0.38cm of predict] (val) {
+        \textbf{6. Relative Valuation \& Tagging}\\[1.5pt]
+        {\scriptsize\color{subtext} $\mathrm{Spread}_t \leftarrow \mathrm{IV}_t - \mathrm{IV}_{t+5}$; \;Tag \texttt{Rich} ($>0.50$), \texttt{Cheap} ($<-0.50$), \texttt{Fair}}
+    };
+
+    \node[pipebox, fill=skyFill, draw=skyBorder, below=0.38cm of val] (persist) {
+        \textbf{7. Persist Outputs \& Log Execution}\\[1.5pt]
+        {\scriptsize\color{subtext} Write to \texttt{live\_iv\_predictions.csv} \& append execution log}
+    };
+
+    \node[lbl, text=slatetext, above=0.16cm of fetch] (trylabel) {TRY BLOCK (PROTECTED EXECUTION)};
+
+    % =========================================================
+    % DASHED TRY-BLOCK CONTAINER
+    % =========================================================
+    \begin{scope}[on background layer]
+        \node[tryframe, fit=(trylabel)(fetch)(persist)] (trybox) {};
+    \end{scope}
+
+    % =========================================================
+    % CONNECTING ARROWS & LOOP ROUTING
+    % =========================================================
+    % Initialization into while-true loop
+    \draw[flow] (start.south) -- (init.north);
+    \draw[flow] (init.south) -- (sync.north);
+    \node[junction] at (loop_top) {};
+    \node[lbl, above right=1.5pt and 5pt of loop_top] {\texttt{while true}};
+
+    % Sync -> Market Session Check
+    \draw[flow] (sync.south) -- (market.north);
+
+    % Market Session = Yes -> Dedicated Center Gutter -> Step 1
+    \coordinate (gutter) at ($(sync.east)!0.5!(trybox.west)$);
+    \draw[flow] (market.east) -- (gutter |- market.east) |- (fetch.west);
+    \node[lbl, above, yshift=1.5pt] at ($(market.east)!0.5!(gutter |- market.east)$) {Yes};
+
+    % Sequential Steps Inside Try Block
+    \draw[flow] (fetch.south) -- (filter.north);
+    \draw[flow] (filter.south) -- (buffer.north);
+    \draw[flow] (buffer.south) -- (features.north);
+    \draw[flow] (features.south) -- (predict.north);
+    \draw[flow] (predict.south) -- (val.north);
+    \draw[flow] (val.south) -- (persist.north);
+
+    % Try Block Exception -> Exception Handler
+    \draw[errflow] (trybox.west |- except.east) -- (except.east);
+    \node[lbl, text=roseBorder, above, yshift=1.5pt] at ($(trybox.west |- except.east)!0.5!(except.east)$) {\texttt{Exception E}};
+
+    % Shared Left Return Bus (Wider offset so "No (continue)" sits completely inside)
+    \coordinate (leftbus) at ([xshift=-1.80cm]sync.west);
+
+    % 1) Market Session = No -> continue loop
+    \draw[flow] (market.west) -- (leftbus |- market.west) |- (loop_top);
+    \node[lbl, above, yshift=1.5pt] at ($(market.west)!0.5!(leftbus |- market.west)$) {No (\texttt{continue})};
+
+    % 2) Exception Handler -> back off & retry loop
+    \draw[flow] (except.west) -- (leftbus |- except.west) |- (loop_top);
+
+    % 3) Normal Iteration Complete -> next 5-min cycle
+    \coordinate (bottombus) at ([yshift=-0.42cm]trybox.south);
+    \draw[flow] (persist.south) -- (bottombus) -| (leftbus |- loop_top) -- (loop_top);
+
+    \end{tikzpicture}%
+    }
+    \caption{Control Flow and Execution Architecture of the Automated 5-Minute Live Volatility Prediction Daemon (Algorithm 2).}
+    \label{fig:daemon_flowchart}
+    \label{alg:live_daemon_flow}
+\end{figure}
 
 The live predictor runs concurrently without blocking user interactions, writing output data directly to disk where downstream trading systems and GUI dashboards consume it asynchronously.
 
@@ -96,13 +284,13 @@ The live predictor runs concurrently without blocking user interactions, writing
 
 To provide quantitative researchers, portfolio managers, and desk traders with an interactive command center, the project features a multi-page institutional Streamlit dashboard (\texttt{streamlit dashboard.py}). Built with a high-contrast dark visual theme, the interface translates complex machine learning outputs into actionable trading intelligence across eight specialized modules:
 
-\begin{enumerate}
+\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
     \item \textbf{Executive KPI Overview:} Displays real-time market pulse cards including spot index level, ATM implied volatility, intraday velocity, volume/OI put-call ratio (PCR), and out-of-sample model performance metrics (RMSE: 1.2188, MAE: 0.5214).
     \item \textbf{Interactive Option Chain Explorer:} A tabular matrix presenting Calls and Puts side-by-side around strike prices, with color-coded badges for moneyness ($K/S$), LTP, bid-ask spreads, open interest depth bars, and IV levels.
     \item \textbf{Volatility Smile \& Skew Analytics:} Renders interactive Plotly 2D volatility smiles across strikes, log-moneyness skew plots highlighting downside put demand, and continuous 3D volatility surfaces across strikes and fractional TTE.
-    \item \textbf{Machine Learning Model Diagnostics:} Provides institutional validation transparency: out-of-sample actual vs.\ predicted parity scatter plots, $\Delta \text{IV}$ error residual distributions with Q-Q normality lines, and top Gini feature importance rankings.
-    \item \textbf{Relative IV Valuation Screener:} An automated desk screener calculating Valuation Spread ($\text{IV}_t - \widehat{\text{IV}}_{t+5}$) across strikes, classifying contracts into Rich/Overvalued ($\text{Spread} > +0.50$), Cheap/Undervalued ($\text{Spread} < -0.50$), and Fair/Neutral regimes.
-    \item \textbf{Black-Scholes Multi-Factor Stress Testing Matrix:} Interactive simulation evaluating contract sensitivity across spot shocks ($\pm 2\%$), volatility shocks ($\pm 20\%$), and time-decay horizons ($0$ to $24$ hours), rendering 3D sensitivity surfaces and scenario P\&L grids.
+    \item \textbf{Machine Learning Model Diagnostics:} Out-of-sample actual vs.\ predicted parity scatter plots, $\Delta \text{IV}$ error residual distributions with Q-Q normality lines, and top impurity-based (MDI) feature importance rankings.
+    \item \textbf{Relative IV Valuation Screener:} An automated desk screener calculating Valuation Spread ($\text{IV}_t - \widehat{\text{IV}}_{t+5}$) across strikes, classifying contracts into Rich/Overvalued, Cheap/Undervalued, and Fair/Neutral regimes.
+    \item \textbf{Black-Scholes Multi-Factor Stress Matrix:} Interactive simulation evaluating contract sensitivity across spot shocks ($\pm 2\%$), volatility shocks ($\pm 20\%$), and time-decay horizons ($0$ to $24\text{h}$), rendering 3D surfaces and P\&L grids.
     \item \textbf{Expiry-Day Robustness Inspector:} Forensic module illustrating the October 19 expiry experiment, contrasting non-expiry performance against the hyper-gamma expiry regime as TTE collapses below 90 minutes.
-    \item \textbf{Data Management \& Export Suite:} Tabular inspection of raw snapshots, engineered feature matrices, and one-click CSV export utilities, with an integrated non-blocking background daemon thread toggle.
+    \item \textbf{Data Management \& Export Suite:} Tabular inspection of raw snapshots, engineered feature matrices, one-click CSV export, and an integrated non-blocking background daemon thread toggle.
 \end{enumerate}

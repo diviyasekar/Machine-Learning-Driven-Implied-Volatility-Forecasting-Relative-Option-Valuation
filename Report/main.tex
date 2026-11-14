@@ -3,7 +3,7 @@
 % =========================================================
 % PACKAGES
 % =========================================================
-\usepackage[margin=0.80in,top=0.80in,bottom=0.80in]{geometry}
+\usepackage[margin=0.75in,top=0.75in,bottom=0.75in]{geometry}
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -72,6 +72,9 @@
 
 \definecolor{skyFill}{RGB}{240, 249, 255}
 \definecolor{skyBorder}{RGB}{14, 165, 233}
+
+\definecolor{roseFill}{RGB}{255, 241, 242}
+\definecolor{roseBorder}{RGB}{244, 63, 94}
 
 % Currency Command
 \newcommand{\rupee}{\text{Rs.\ }}
@@ -339,18 +342,21 @@ I extend my sincere appreciation to the \textbf{Head of the Department of Statis
 \thispagestyle{plain}
 \phantomsection
 \addcontentsline{toc}{chapter}{Abstract}
+\onehalfspacing
 \begin{center}
-    \textbf{\LARGE ABSTRACT} \\[0.8cm]
+    \textbf{\LARGE ABSTRACT} \\[0.6cm]
 \end{center}
 
 \noindent
-Implied Volatility (IV) constitutes the market's forward-looking gauge of aggregate risk and the core unobservable input in options pricing and risk management. In high-frequency and intraday algorithmic derivatives trading, conventional market-making models frequently assume that implied volatility is stationary over short horizons (the \textit{persistence assumption}, $\widehat{\text{IV}}_{t+5} = \text{IV}_t$) or rely on static parametric volatility smiles. In reality, short-term volatility displays non-linear autoregressive clustering, asymmetric momentum responses to underlying spot moves, and market microstructure frictions. 
+Implied Volatility (IV) constitutes the primary forward-looking gauge of aggregate market risk and the core unobservable input in financial derivatives pricing. In intraday algorithmic options trading, market makers frequently assume short-term stationarity (the persistence benchmark, $\widehat{\text{IV}}_{t+5} = \text{IV}_t$) or rely on static parametric volatility smiles, failing to capture high-frequency autoregressive clustering, volatility momentum, and microstructure liquidity frictions. This thesis develops and deploys an end-to-end quantitative framework for \textbf{5-minute-ahead implied volatility forecasting ($\Delta \text{IV}_{t+5}$)} and \textbf{relative option valuation} on \textbf{NIFTY 50 weekly index options} traded on the National Stock Exchange of India (NSE). The production architecture ingests wall-clock synchronized 5-minute option chains via the Upstox API v2, enforces quantitative hygiene ($0.95 \le K/S \le 1.05$, zero-IV purging, bid-ask spread validation), derives continuous fractional Time-to-Expiry (TTE) in hours, and constructs a 39-dimensional feature space spanning multi-horizon autoregressive lags, underlying spot velocity, and order-book liquidity dynamics.
 
-This thesis presents the design, mathematical formulation, empirical benchmarking, and production deployment of an end-to-end quantitative machine learning framework for **5-minute-ahead implied volatility forecasting ($\Delta \text{IV}_{t+5}$)** and **relative option valuation** on **NIFTY 50 weekly index options** traded on the National Stock Exchange of India (NSE). The framework ingests regularized 5-minute option chain snapshots via the Upstox API v2, enforces rigorous data hygiene (filtering non-positive IV quotes, invalid bid-ask spreads, and near-ATM strike constraints $0.95 \le K/S \le 1.05$), calculates exact fractional Time-to-Expiry (TTE) in hours, and engineers a 39-dimensional feature space capturing multi-horizon volatility velocity, spot momentum, and order book liquidity.
+\vspace{0.35cm}
+\noindent
+Under strict chronological partitioning to guarantee zero temporal look-ahead leakage, non-parametric machine learning models are evaluated against the persistence benchmark and an Ordinary Least Squares (OLS) baseline. A tuned Random Forest regressor achieves a \textbf{5.28\% reduction in MAE} (0.5214 vs.\ 0.5505) and a \textbf{7.72\% reduction in RMSE} (1.2188 vs.\ 1.3207) over the persistence baseline, whereas OLS fails completely ($R^2 = -0.2410$) due to non-linear smile curvature. Impurity-based feature importance (Mean Decrease in Impurity / MDI) indicates that short-term volatility velocity ($\text{IV}_{\text{change}, 5\text{m}}$) and bid-ask spreads dominate static contract traits. Directional conviction filtering ($|\widehat{\Delta\text{IV}}| \ge 0.10$) elevates directional hit-rate from \textbf{53.20\% to 63.40\%}, eliminating low-conviction noise churn. Predictions power a Relative IV Valuation Screener categorizing contracts into \textbf{Fair (77.92\%)}, \textbf{Rich (15.46\%)}, and \textbf{Cheap (6.61\%)}, and a Black-Scholes scenario engine for multi-factor Greek stress testing. Out-of-sample forensic stress testing on an unseen expiry day reveals a structural regime breakdown ($\text{MAE}$ surges to 17.42), demonstrating the empirical limits of mid-week models in the hyper-gamma, vanishing-vega final hours. The system is operationalized via a live 5-minute automated background prediction daemon and an institutional multi-page Streamlit analytics dashboard.
 
-Using a strict chronological train/test split to prevent look-ahead bias, predictive models are empirically evaluated against the random walk persistence benchmark and an Ordinary Least Squares (OLS) linear baseline. A tuned Random Forest regressor engineered with short-term volatility lags achieves a **5.28\% reduction in Mean Absolute Error (MAE)** (0.5214 vs.\ 0.5505) and a **7.72\% reduction in Root Mean Squared Error (RMSE)** (1.2188 vs.\ 1.3207) over the persistence baseline, while OLS completely deteriorates ($R^2 = -0.2410$, $\text{MAE} = 6.1720$) due to extreme non-linear curvature across moneyness space. Gini importance metrics reveal that recent volatility velocity ($\text{IV}_{\text{change}, 5m}$, $\text{IV}_{\text{change}, 10m}$) and bid-ask spreads dominate static contract characteristics. Applying directional conviction thresholding ($|\widehat{\Delta \text{IV}}| \ge 0.10$) increases directional classification accuracy from a noisy baseline of **53.20\% to 63.40\%** (and 64.47\% at $\ge 0.25$), providing execution desks with actionable filter mechanics.
-
-The forecasted volatility is synthesized into a Relative IV Valuation Engine, categorizing option strikes into **Fair/Neutral (77.92\%)**, **Overvalued/Rich (15.46\%)**, and **Undervalued/Cheap (6.61\%)** regimes to drive systematic spread strategies. A multi-factor Black-Scholes scenario engine evaluates non-linear Greek sensitivities across joint spot, volatility, and time shocks. Crucially, out-of-sample stress testing on an unseen weekly expiry day (October 19, 2026, $T < 1.58$ hours) reveals an econometric regime breakdown ($\text{MAE}$ spiking to 17.42), proving that non-expiry volatility dynamics collapse in the hyper-gamma, hyper-theta, vanishing-vega final hours. Finally, the system is operationalized via a live 5-minute automated background prediction daemon and an institutional multi-page Streamlit analytics dashboard.
+\vspace{0.5cm}
+\noindent
+\textbf{Keywords:} Implied Volatility Forecasting, NIFTY 50 Weekly Options, Random Forest, Persistence Benchmark, Relative Option Valuation, Black-Scholes Greeks, Microstructure Liquidity.
 
 % =========================================================
 % TABLE OF CONTENTS & LISTS
