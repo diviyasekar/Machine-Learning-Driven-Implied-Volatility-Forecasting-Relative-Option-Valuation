@@ -1,54 +1,15 @@
 \chapter{Appendices}
 \label{chap:appendices}
 
-\section{Appendix A: Mathematical Derivations of Greeks and Lemma 1}
-\label{sec:appendix_lemma_proof}
-
-This appendix provides the full calculus proofs for the Black-Scholes-Merton foundational identity (Lemma 1), the primary Greeks ($\Delta, \nu, \Theta$), and higher-order cross-sensitivities (Vanna, Volga, Charm).
-
-\subsection{Proof of Lemma 1: The Boundary Identity $S N'(d_1) = K e^{-r\tau} N'(d_2)$}
-Recall $N'(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2 / 2}$ and $d_2 = d_1 - \sigma \sqrt{\tau}$. Evaluating the ratio:
-\begin{align}
-    \frac{S N'(d_1)}{K e^{-r\tau} N'(d_2)} &= \frac{S}{K e^{-r\tau}} \exp\left( -\tfrac{1}{2} (d_1^2 - d_2^2) \right) \\
-    &= \frac{S}{K e^{-r\tau}} \exp\left( -\tfrac{1}{2} [2 d_1 \sigma \sqrt{\tau} - \sigma^2 \tau] \right) = \frac{S}{K e^{-r\tau}} \exp(-\ln(S/K) - r\tau) = 1
-\end{align}
-Hence, $S N'(d_1) = K e^{-r\tau} N'(d_2)$ holds identically for all $S, K, \sigma > 0$ and $\tau > 0$ \quad $\blacksquare$.
-
-\subsection{Proof of Delta ($\Delta_C = N(d_1)$) and Vega ($\nu = S\sqrt{\tau}N'(d_1)$)}
-Differentiating $C = S N(d_1) - K e^{-r\tau} N(d_2)$ with respect to $S$:
-\begin{equation}
-    \frac{\partial C}{\partial S} = N(d_1) + \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial S} = N(d_1) \quad (\text{by Lemma 1})
-\end{equation}
-Differentiating $C$ with respect to $\sigma$ where $\frac{\partial d_2}{\partial \sigma} = \frac{\partial d_1}{\partial \sigma} - \sqrt{\tau}$:
-\begin{equation}
-    \frac{\partial C}{\partial \sigma} = \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial \sigma} + K e^{-r\tau} N'(d_2) \sqrt{\tau} = S \sqrt{\tau} N'(d_1) \quad (\text{by Lemma 1})
-\end{equation}
-
-\subsection{Proof of Theta ($\Theta_C = -\frac{S \sigma N'(d_1)}{2\sqrt{\tau}} - r K e^{-r\tau} N(d_2)$)}
-Differentiating $C$ with respect to $\tau$ where $\frac{\partial d_2}{\partial \tau} = \frac{\partial d_1}{\partial \tau} - \frac{\sigma}{2\sqrt{\tau}}$:
-\begin{equation}
-    \frac{\partial C}{\partial \tau} = \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{\partial d_1}{\partial \tau} + \frac{K e^{-r\tau} N'(d_2) \sigma}{2\sqrt{\tau}} + r K e^{-r\tau} N(d_2) = \frac{S \sigma N'(d_1)}{2\sqrt{\tau}} + r K e^{-r\tau} N(d_2)
-\end{equation}
-Since $\Theta_C = -\partial C / \partial \tau$, this establishes Eq. \eqref{eq:theta_call}.
-
-\subsection{Derivations of Higher-Order Greeks (Vanna, Volga, Charm)}
-\label{sec:appendix_higher_order_greeks}
-\begin{align}
-    \text{Vanna} &= \frac{\partial \Delta_C}{\partial \sigma} = N'(d_1) \frac{\partial d_1}{\partial \sigma} = -\frac{N'(d_1) d_2}{\sigma} = -\frac{e^{-d_1^2 / 2} d_2}{\sigma \sqrt{2\pi}} \label{eq:vanna_formula} \\
-    \text{Volga} &= \frac{\partial \nu}{\partial \sigma} = S \sqrt{\tau} N'(d_1) \frac{d_1 d_2}{\sigma} = \nu \frac{d_1 d_2}{\sigma} \label{eq:volga_formula} \\
-    \text{Charm} &= -\frac{\partial \Delta_C}{\partial \tau} = -N'(d_1) \left[ \frac{r}{\sigma \sqrt{\tau}} - \frac{d_2}{2\tau} \right] \label{eq:charm_formula}
-\end{align}
-
-\section{Appendix B: Complete 39-Dimensional Feature Schema}
+\section{Appendix A: Complete 39-Dimensional Feature Schema Specification}
 \label{sec:appendix_feature_schema}
 
-Table \ref{tab:complete_feature_schema} outlines all 39 serialized features (\texttt{nifty\_iv\_model\_features.joblib}).
+The production machine learning pipeline serializes an exact 39-dimensional feature schema in the model artifact file \path{nifty_iv_model_features.joblib}. During live execution, incoming option chain snapshots are aligned against this schema, stripping extraneous fields and applying median imputation to ensure fault-tolerant inference. Table \ref{tab:complete_feature_schema} outlines all 39 features, their temporal lag horizons, and their quantitative formulations.
 
-\vspace{-0.3cm}
 \begin{table}[H]
     \centering
-    \tiny
-    \renewcommand{\arraystretch}{0.72}
+    \scriptsize
+    \renewcommand{\arraystretch}{0.85}
     \caption{Complete 39-Dimensional Feature Schema Specification.}
     \label{tab:complete_feature_schema}
     \begin{tabularx}{\textwidth}{rllp{2.2cm}X}
@@ -73,19 +34,22 @@ Table \ref{tab:complete_feature_schema} outlines all 39 serialized features (\te
     \end{tabularx}
 \end{table}
 
-\vspace{-0.3cm}
-\section{Appendix C: Core Algorithmic Source Code Modules}
+\section{Appendix B: Core Algorithmic Source Code Modules}
 \label{sec:appendix_source_code}
 
-\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=2pt, xleftmargin=0.8em, lineskip=-2.0pt}
+This appendix provides the core Python implementation modules used for exact time-to-expiry calculation, autoregressive lag feature construction, real-time live inference, and relative option valuation categorization.
 
-\subsection{C.1 Exact Fractional TTE Calculation \& Vectorized Lag Construction}
-\begin{lstlisting}[language=Python, caption={Exact Fractional TTE and Multi-Horizon Lag Construction.}]
+\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=3pt, xleftmargin=1.0em, lineskip=-1.5pt}
+
+\subsection{B.1 Exact Fractional TTE Calculation \& Vectorized Lag Construction}
+Listing \ref{lst:tte_lags} details the vectorized computation of fractional Time-to-Expiry in hours and the construction of rolling autoregressive lags across option chain snapshots.
+
+\begin{lstlisting}[language=Python, caption={Exact Fractional TTE and Multi-Horizon Lag Construction.}, label={lst:tte_lags}]
 import pandas as pd
 
 def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # Fractional hours to expiry (standardized to 15:30 IST)
+    # Fractional hours to expiry (standardized to 15:30 IST on weekly expiry)
     df['expiry_dt'] = pd.to_datetime(df['expiry']) + pd.Timedelta(hours=15, minutes=30)
     df['exact_tte_hours'] = (df['expiry_dt'] - pd.to_datetime(df['timestamp'])).dt.total_seconds() / 3600.0
     df['exact_tte_hours'] = df['exact_tte_hours'].clip(lower=1e-5)
@@ -101,18 +65,23 @@ def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
     return df
 \end{lstlisting}
 
-\subsection{C.2 Production Live Inference \& Relative Valuation Screener}
-\begin{lstlisting}[language=Python, caption={Production Live Inference and Valuation Categorization.}]
+\subsection{B.2 Production Live Inference \& Relative Valuation Screener}
+Listing \ref{lst:live_inference} presents the production live inference routine that maps real-time feature matrices into 5-minute volatility forecasts and assigns actionable economic valuation tags.
+
+\begin{lstlisting}[language=Python, caption={Production Live Inference and Valuation Categorization.}, label={lst:live_inference}]
 import numpy as np
 
 def run_live_inference_and_valuation(current_features, model, schema, medians, delta_val=0.50):
+    # Align features against strict training schema and fill residual NaNs
     X = current_features.reindex(columns=schema).fillna(medians)
+    
+    # Predict 5-minute volatility change and expected future IV
     pred_delta_iv = model.predict(X)
     current_iv = current_features['IV'].values
     pred_future_iv = current_iv + pred_delta_iv
     valuation_spread = current_iv - pred_future_iv
     
-    # Economic regime tags
+    # Assign institutional economic regime tags
     regimes = np.where(valuation_spread > delta_val, 'Rich / Overvalued',
               np.where(valuation_spread < -delta_val, 'Cheap / Undervalued', 'Fair / Neutral'))
     return pred_future_iv, pred_delta_iv, valuation_spread, regimes

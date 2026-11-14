@@ -90,7 +90,7 @@ Figures \ref{fig:actual_vs_predicted_iv} and \ref{fig:actual_vs_predicted_delta_
 The actual versus predicted implied volatility points cluster tightly along the 45-degree line of perfect parity across the entire volatility spectrum (from $8\%$ to $28\%$). The dispersion remains homoskedastic across near-the-money strikes, demonstrating that the ensemble does not suffer from scale bias. In Figure \ref{fig:actual_vs_predicted_delta_iv}, predicting incremental velocity ($\Delta \text{IV}$) is evaluated; large volatility expansions ($\Delta \text{IV} > +0.50$) and contractions ($\Delta \text{IV} < -0.50$) are reliably captured along the positive diagonal.
 
 \subsection{Comparative Error Distribution \& Feature Importance}
-Figures \ref{fig:rf_vs_persistence} and \ref{fig:feature_importance} display the comparative prediction error distribution ($y - \widehat{y}$) alongside the top Gini feature importances.
+Figures \ref{fig:rf_vs_persistence} and \ref{fig:feature_importance} display the comparative prediction error distribution ($y - \widehat{y}$) alongside the top impurity-based feature importances (Mean Decrease in Impurity).
 
 \begin{figure}[htbp]
     \centering
@@ -104,7 +104,7 @@ Figures \ref{fig:rf_vs_persistence} and \ref{fig:feature_importance} display the
     \begin{minipage}{0.48\textwidth}
         \centering
         \includegraphics[width=\textwidth]{04_feature_importance.png}
-        \caption{Top Gini Feature Importance Hierarchy.}
+        \caption{Top Impurity-Based Feature Importance Hierarchy (MDI).}
         \label{fig:feature_importance}
     \end{minipage}
 \end{figure}
@@ -115,7 +115,7 @@ The Random Forest error distribution exhibits a visibly taller, narrower central
     \centering
     \scriptsize
     \renewcommand{\arraystretch}{0.88}
-    \caption{Quantitative Feature Importance Weights (Random Forest Regressor).}
+    \caption{Quantitative Feature Importance Weights (Random Forest Regressor, MDI Metric).}
     \label{tab:feature_importance_breakdown}
     \begin{tabularx}{\textwidth}{llcX}
         \toprule
@@ -184,13 +184,13 @@ The empirical results confirm Hypothesis 3 ($H_3$):
 \section{Relative IV Valuation Screener Findings}
 \label{sec:relative_valuation_results}
 
-The Relative IV Valuation Engine translates model forecasts into actionable trade recommendations by evaluating the Valuation Spread $\text{Spread}_i = \text{IV}_{t, i} - \widehat{\text{IV}}_{t+5, i}$ across all active strikes.
+The Relative IV Valuation Engine translates model forecasts into actionable trade recommendations by evaluating the Valuation Spread $\text{Spread}_i = \text{IV}_{t, i} - \widehat{\text{IV}}_{t+5, i}$ across all active strikes. Importantly, these *Overvalued* and *Undervalued* classifications reflect relative pricing discrepancies against the model's short-term projection rather than absolute no-arbitrage boundary violations.
 
 Across the out-of-sample dataset, the 983 analyzed near-ATM option contracts are classified into three distinct regimes:
 \begin{enumerate}
     \item \textbf{Fair / Neutral IV (77.92\% | 766 contracts):} The vast majority of strikes exhibit Valuation Spreads bounded within $\pm 0.50$ IV points. The observed market implied volatility closely tracks model equilibrium expectations, indicating efficient pricing where pure directional or delta-neutral market making is appropriate.
-    \item \textbf{High IV / Rich / Overvalued (15.46\% | 152 contracts):} Market IV trades at an elevation greater than $+0.50$ points above model forecast. These contracts represent expensive options where volatility is projected to compress, making them prime candidates for credit vertical spreads, iron condors, or covered call writing.
-    \item \textbf{Low IV / Cheap / Undervalued (6.61\% | 65 contracts):} Market IV trades at a discount exceeding $-0.50$ points below model forecast. These contracts represent underpriced options where volatility expansion is imminent, identifying candidates for long debit spreads, straddles, or calendar spreads.
+    \item \textbf{High IV / Rich / Overvalued (15.46\% | 152 contracts):} Market IV trades at an elevation greater than $+0.50$ points above model forecast. These contracts represent relatively expensive options where volatility is projected to compress, making them candidate strikes for credit vertical spreads, iron condors, or covered call writing.
+    \item \textbf{Low IV / Cheap / Undervalued (6.61\% | 65 contracts):} Market IV trades at a discount exceeding $-0.50$ points below model forecast. These contracts represent relatively underpriced options where volatility expansion is expected, identifying candidate strikes for long debit spreads, straddles, or calendar spreads.
 \end{enumerate}
 
 \begin{figure}[htbp]
@@ -316,14 +316,14 @@ The catastrophic breakdown observed in Table \ref{tab:expiry_day_collapse_metric
 
 \begin{enumerate}
     \item \textbf{Hyperbolic Gamma and Theta Singularity as $\tau \to 0$:}
-    As derived in Section \ref{subsec:gamma_derivation} and \ref{subsec:theta_derivation}:
+    As detailed in Section \ref{sec:greeks_definitions} and Table \ref{tab:greeks_reference_guide}:
     \begin{equation}
         \lim_{\tau \to 0} \Gamma_{\text{ATM}} = +\infty, \quad \lim_{\tau \to 0} \Theta_{\text{ATM}} = -\infty
     \end{equation}
     In the final 90 minutes before settlement, an option's extrinsic time value vanishes vertically. Any minor tick in the NIFTY 50 spot index causes immediate, discontinuous flips between pure intrinsic value and total worthlessness. The continuous diffusion assumptions underpinning mid-week volatility dynamics are mathematically violated.
 
     \item \textbf{The Vanishing Vega Breakdown:}
-    As derived in Section \ref{subsec:vega_derivation}:
+    As analyzed in Section \ref{subsec:weekly_expiry_dynamics} and Table \ref{tab:greeks_reference_guide}:
     \begin{equation}
         \lim_{\tau \to 0} \nu = \lim_{\tau \to 0} S \sqrt{\tau} N'(d_1) = 0
     \end{equation}

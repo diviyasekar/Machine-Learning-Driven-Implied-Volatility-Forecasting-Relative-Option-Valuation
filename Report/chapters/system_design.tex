@@ -104,10 +104,14 @@ The returned JSON payload encapsulates the complete market depth and pricing par
         \texttt{option\_type} & string & CE / PE & Option contract style (\texttt{CE} = European Call, \texttt{PE} = European Put). \\
         \texttt{LTP, Bid, Ask} & float64 & INR (\rupee) & Last Traded Price, highest limit buy quote, and lowest limit sell quote. \\
         \texttt{Volume, OI} & int/float & Contracts & Cumulative intraday traded contracts and total open interest. \\
-        \texttt{IV, pcr} & float64 & \% / Ratio & Upstox/NSE computed implied volatility and strike-specific Put-Call Ratio. \\
+        \texttt{IV, pcr} & float64 & \% / Ratio & Official exchange/vendor implied volatility and strike Put-Call Ratio. \\
         \bottomrule
     \end{tabularx}
 \end{table}
+
+\noindent
+\textbf{Note on Implied Volatility Sources:}
+The baseline implied volatility (\texttt{IV}) ingested in real-time through the Upstox API v2 is calculated by the exchange/vendor from live limit order book quotes. Our custom Newton-Raphson engine (described in Chapter \ref{chap:algorithms}) is utilized for theoretical scenario evaluation, multi-factor stress testing, and recovering implied volatilities during counterfactual sensitivity experiments.
 
 \section{Data Sanitation, Filtering \& Quantitative Hygiene}
 \label{sec:data_sanitation}

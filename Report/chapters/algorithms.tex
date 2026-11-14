@@ -1,166 +1,86 @@
 \chapter{Mathematical Formulations, Greeks Derivations \& Algorithmic Engines}
 \label{chap:algorithms}
 
-\section{Mathematical Derivations of the Black-Scholes-Merton Greeks}
-\label{sec:greeks_derivations}
+\section{Option Greeks: Practical Definitions \& Desk Sensitivity Framework}
+\label{sec:greeks_definitions}
 
-The Black-Scholes-Merton (BSM) Greeks represent the partial derivatives of option prices with respect to fundamental underlying state parameters: spot price ($S$), volatility ($\sigma$), time-to-expiry ($\tau = T - t$), and risk-free interest rate ($r$). They form the analytical foundation for dynamic hedging, portfolio risk measurement, and scenario stress testing.
+In options trading and quantitative risk management, the **Greeks** measure the sensitivity of an option's market price to changes in fundamental underlying variables: the underlying asset spot price ($S$), return volatility ($\sigma$), time-to-expiry ($\tau = T - t$), and the risk-free interest rate ($r$). Rather than treating them merely as abstract partial derivatives, institutional derivatives desks use the Greeks as real-time risk gauges to maintain delta neutrality, budget capital, and manage portfolio stress.
 
-Let the closed-form BSM formulas for European call ($C$) and put ($P$) options on a non-dividend asset be:
-\begin{equation}
-    C = S N(d_1) - K e^{-r\tau} N(d_2), \quad P = K e^{-r\tau} N(-d_2) - S N(-d_1)
-    \label{eq:bsm_prices_alg}
-\end{equation}
-where $N(x) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{x} e^{-u^2/2} du$ is the cumulative standard normal distribution function, $N'(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2/2}$ is the standard normal probability density function, and the standardized moneyness coordinates are:
-\begin{equation}
-    d_1 = \frac{\ln(S / K) + \left(r + \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}, \quad d_2 = d_1 - \sigma \sqrt{\tau} = \frac{\ln(S / K) + \left(r - \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}
-    \label{eq:d1_d2_alg}
-\end{equation}
-Here, the physical variables are defined as:
-\begin{itemize}
-    \item $S$: Current underlying NIFTY 50 index spot price (\rupee).
-    \item $K$: Contract strike price (\rupee).
-    \item $\tau$: Annualized continuous time-to-expiry ($\tau = \text{TTE}_{\text{hours}} / 8760$).
-    \item $r$: Continuously compounded annualized risk-free interest rate ($r = 0.065$, based on 91-day T-Bills).
-    \item $\sigma$: Annualized return volatility (Implied Volatility parameter).
-    \item $N(d_2)$: The risk-neutral probability that the option finishes in-the-money ($S_T > K$).
-    \item $S N(d_1)$: The expected present value of receiving the underlying index upon exercise.
-\end{itemize}
+Table \ref{tab:greeks_reference_guide} provides a comprehensive institutional reference guide for the primary Black-Scholes-Merton Greeks, detailing their mathematical formulations, practical market definitions, trading desk interpretations, and real-world numerical impact on a standard 50-share NIFTY 50 options contract.
 
-\noindent
-\textbf{Trader's Financial Intuition:}
-The BSM call equation decomposes an option into a leveraged position: buying $N(d_1)$ units of the underlying NIFTY 50 index funded by borrowing $K e^{-r\tau} N(d_2)$ at the risk-free rate. $N(d_2)$ represents the market's estimated probability of exercise, while $N(d_1)$ represents the replicating delta hedge ratio required to eliminate instantaneous market risk.
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \renewcommand{\arraystretch}{0.95}
+    \caption{Institutional Greeks Reference Guide for NIFTY 50 Options Trading.}
+    \label{tab:greeks_reference_guide}
+    \begin{tabularx}{\textwidth}{lp{2.4cm}p{3.2cm}p{3.8cm}X}
+        \toprule
+        \textbf{Greek} & \textbf{Formula} & \textbf{Practical Definition} & \textbf{Desk Interpretation} & \textbf{NIFTY Example (50-Share Lot)} \\
+        \midrule
+        \textbf{Delta} ($\Delta$) & $\Delta_C = N(d_1)$ \newline $\Delta_P = N(d_1) - 1$ & Sensitivity of option price to a 1-point move in the underlying index spot price ($\partial V / \partial S$). & Directional hedge ratio. Indicates how many index units are needed to make a position market-neutral. & A call with $\Delta = 0.50$ gains \rupee 0.50/share (\rupee 25/lot) when NIFTY rises by 1 point. \\
+        \addlinespace
+        \textbf{Gamma} ($\Gamma$) & $\Gamma = \frac{N'(d_1)}{S \sigma \sqrt{\tau}}$ & Rate of change of Delta per 1-point move in the underlying index ($\partial^2 V / \partial S^2$). & Measures the convexity and stability of a delta hedge. Long gamma automatically "buys low and sells high." & A contract with $\Gamma = 0.005$ increases its Delta from $0.50$ to $0.55$ if NIFTY rises 10 points. \\
+        \addlinespace
+        \textbf{Vega} ($\nu$) & $\nu = S \sqrt{\tau} N'(d_1)$ & Sensitivity of option price to a 1.0 percentage point change in implied volatility ($\partial V / \partial \sigma$). & Measures portfolio exposure to volatility shocks. Highest for at-the-money options; scales with $\sqrt{\tau}$. & A contract with Vega $= 14.0$ gains \rupee 14/share (\rupee 700/lot) if IV expands from 12\% to 13\%. \\
+        \addlinespace
+        \textbf{Theta} ($\Theta$) & $\Theta_C \approx -\frac{S \sigma N'(d_1)}{2 \sqrt{\tau}}$ \newline $- r K e^{-r\tau} N(d_2)$ & Deterministic daily erosion of extrinsic premium as calendar time elapses ($\partial V / \partial t$). & The "rent" option buyers pay option sellers for holding asymmetric payoff exposure. Non-linear decay. & An ATM call with $\Theta = -8.0$ loses \rupee 8/share (\rupee 400/lot) each day if spot and IV stay flat. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-\subsection{Foundational Lemma: The Identity $S N'(d_1) = K e^{-r\tau} N'(d_2)$}
-\label{subsec:foundational_lemma}
+\subsection{Managing Greeks in Weekly Options: The Expiry-Week Effect}
+\label{subsec:weekly_expiry_dynamics}
 
-\noindent
-\textbf{Lemma 1.} \textit{For all $S, K, \sigma > 0$ and $\tau > 0$, the following boundary identity holds identically:}
-\begin{equation}
-    S N'(d_1) = K e^{-r\tau} N'(d_2)
-    \label{eq:fundamental_identity}
-\end{equation}
-where $N'(d_1) = \frac{1}{\sqrt{2\pi}} e^{-d_1^2/2}$ and $N'(d_2) = \frac{1}{\sqrt{2\pi}} e^{-d_2^2/2}$ represent the standard normal probability density ordinates evaluated at $d_1$ and $d_2$.
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Lemma 1 states that the marginal change in the expected asset receipt at the exercise boundary exactly equals the discounted marginal change in the strike payment. In derivatives mathematics, this identity is the engine that causes all boundary derivative terms to cancel out when differentiating $C$ with respect to $S, \sigma$, and $\tau$, ensuring that Delta, Vega, and Gamma have clean, closed-form representations without boundary slippage terms. (The complete step-by-step algebraic derivation is presented in Appendix \ref{sec:appendix_lemma_proof}).
-
-\subsection{Delta ($\Delta$) — Directional Exposure \& Replicating Hedge Ratio}
-\label{subsec:delta_derivation}
-
-Differentiating the Call price $C$ with respect to spot $S$ using the chain rule and applying Lemma 1 yields:
-\begin{equation}
-    \Delta_C = \frac{\partial C}{\partial S} = N(d_1) \in (0, 1), \quad \Delta_P = \frac{\partial P}{\partial S} = N(d_1) - 1 = -N(-d_1) \in (-1, 0)
-    \label{eq:delta_formulas}
-\end{equation}
-where:
-\begin{itemize}
-    \item $\Delta_C$: Call option delta, bounded between $0$ (deep out-of-the-money) and $1$ (deep in-the-money).
-    \item $\Delta_P$: Put option delta, bounded between $-1$ (deep in-the-money) and $0$ (deep out-of-the-money).
-\end{itemize}
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Delta serves two central functions on an institutional trading desk:
+For weekly index options traded on the National Stock Exchange of India (NSE), the behavior of the Greeks changes dramatically across the weekly contract lifecycle:
 \begin{enumerate}
-    \item \textbf{Directional Sensitivity:} A call contract with $\Delta = 0.50$ on a 50-share NIFTY lot gains \rupee 25 for every 1-point increase in the NIFTY 50 index ($0.50 \times 1 \times 50$).
-    \item \textbf{Delta Neutrality (Hedge Ratio):} To eliminate directional risk, a market maker who writes 100 ATM call options must buy exactly $100 \times 0.50 \times 50 = 2,500$ units of NIFTY futures.
+    \item \textbf{Delta Discontinuity:} Early in the week (e.g., Monday, $\tau \approx 72\text{ hours}$), Delta varies smoothly across moneyness space. However, on Thursday afternoon ($\tau < 2\text{ hours}$), Delta snaps into a near-discontinuous step function: jumping to $1.0$ for strikes even slightly in-the-money ($S > K$) and plunging to $0.0$ for strikes out-of-the-money ($S < K$).
+    \item \textbf{Asymptotic Gamma Explosion ($\tau \to 0$):} Because the denominator of Gamma contains $\sqrt{\tau}$, $\lim_{\tau \to 0} \Gamma_{\text{ATM}} = +\infty$. In the final hours of expiry Thursday, at-the-money Gamma explodes. A sudden 20-point swing in the NIFTY index can instantly flip an option's Delta from $0.20$ to $0.80$, forcing market makers to execute massive, costly rebalancing orders.
+    \item \textbf{Vanishing Vega ($\tau \to 0$):} Because Vega is directly scaled by $\sqrt{\tau}$, $\lim_{\tau \to 0} \nu = 0$. On expiry afternoon, weekly options have virtually zero sensitivity to volatility news. Traders cannot protect near-expiry options with volatility hedges because option values are driven almost entirely by intrinsic delta.
+    \item \textbf{Hyper-Theta Decay:} Time decay does not occur in equal daily installments; it accelerates exponentially in the final 48 hours. While systematic option sellers (e.g., short straddle and iron condor traders) capture rapid premium erosion, they face severe pin risk and gamma expansion if the underlying breaks away from the strike.
 \end{enumerate}
-As expiration approaches ($\tau \to 0$), Delta snaps into a discontinuous step function: jumping to $1.0$ for contracts in-the-money ($S > K$) and plunging to $0.0$ for contracts out-of-the-money ($S < K$), rendering delta-hedging extremely difficult in the final hours.
 
-\subsection{Gamma ($\Gamma$) — Convexity \& Rebalancing Cost}
-\label{subsec:gamma_derivation}
+\section{The Black-Scholes PDE \& No-Arbitrage Carry Equilibrium}
+\label{sec:bsm_pde_equilibrium}
 
-Gamma represents the second derivative of the option price with respect to underlying spot price, measuring the rate of change of Delta:
-\begin{equation}
-    \Gamma = \frac{\partial^2 C}{\partial S^2} = \frac{\partial \Delta_C}{\partial S} = \frac{N'(d_1)}{S \sigma \sqrt{\tau}} = \frac{e^{-d_1^2/2}}{S \sigma \sqrt{2\pi \tau}} > 0
-    \label{eq:gamma_call}
-\end{equation}
-where $\Gamma_C = \Gamma_P > 0$ for both Calls and Puts across all valid market parameters.
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Gamma measures the curvature (convexity) of option value. A trader who is "long gamma" gains delta as the index rises and loses delta as it falls—automatically "buying low and selling high" during market swings. Conversely, an option seller who is "short gamma" suffers accelerated losses during large index moves. 
-\begin{itemize}
-    \item \textbf{Asymptotic Expiry Singularity ($\tau \to 0$):} For ATM contracts ($d_1 \approx 0$), $\lim_{\tau \to 0} \Gamma_{\text{ATM}} = \lim_{\tau \to 0} \frac{1}{S\sigma\sqrt{2\pi\tau}} = +\infty$. In the final hours of weekly expiry, Gamma explodes toward infinity, meaning that even a minor 10-point intraday index swing drastically alters the delta from $0.10$ to $0.90$. Desks at Surabhi Investment Services enforce hard gamma limits to avoid catastrophic rebalancing slippage.
-\end{itemize}
-
-\subsection{Vega ($\nu$) — Implied Volatility Exposure \& Expiry Collapse}
-\label{subsec:vega_derivation}
-
-Vega measures the sensitivity of the option price to changes in implied volatility $\sigma$:
-\begin{equation}
-    \nu = \frac{\partial C}{\partial \sigma} = \frac{\partial P}{\partial \sigma} = S \sqrt{\tau} N'(d_1) = \frac{S \sqrt{\tau}}{\sqrt{2\pi}} e^{-d_1^2/2} > 0
-    \label{eq:vega_call}
-\end{equation}
-where $\nu$ is identical for calls and puts, achieving its global maximum exactly at-the-money ($d_1 = 0$).
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Vega quantifies the absolute Rupee gain or loss resulting from a $1.0$ unit ($100\%$ volatility, or $\nu / 100$ for a $1\%$ point) shift in implied volatility. For example, a contract with $\nu = 14.5$ increases in value by \rupee 14.50 per share if market implied volatility expands by 1 percentage point (e.g., from 11\% to 12\%).
-\begin{itemize}
-    \item \textbf{Vanishing Vega near Expiry ($\tau \to 0$):} Because Vega is directly scaled by $\sqrt{\tau}$, $\lim_{\tau \to 0} \nu = 0$. On expiry afternoon, weekly options possess virtually zero vega. Traders cannot hedge near-expiry contracts using volatility strategies because the option price is driven entirely by spot delta and intrinsic value.
-\end{itemize}
-
-\subsection{Theta ($\Theta$) — Time Decay \& The Option Seller's Rent}
-\label{subsec:theta_derivation}
-
-Theta measures the deterministic erosion of option value as calendar time elapses ($\tau \to 0$):
-\begin{align}
-    \Theta_C &= -\frac{\partial C}{\partial \tau} = -\frac{S \sigma N'(d_1)}{2 \sqrt{\tau}} - r K e^{-r\tau} N(d_2) \label{eq:theta_call} \\
-    \Theta_P &= -\frac{\partial P}{\partial \tau} = -\frac{S \sigma N'(d_1)}{2 \sqrt{\tau}} + r K e^{-r\tau} N(-d_2) \label{eq:theta_put}
-\end{align}
-Dividing by $365$ yields the 1-day calendar theta decay, while dividing by $8760$ yields the 1-hour intraday theta decay.
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Theta is the physical cost of time decay—the "rent" that option buyers pay to option sellers for holding asymmetric payoff exposure. A long ATM call with Theta $= -8.4$ loses \rupee 8.40 per share each day if spot and volatility remain unchanged. For weekly options, Theta decay does not occur linearly; it accelerates exponentially in the final 48 hours ($\lim_{\tau \to 0} \Theta_{\text{ATM}} = -\infty$). This hyper-theta decay creates lucrative opportunities for systematic option sellers (e.g., iron condors, short strangles), but exposes them to catastrophic gamma gap risk if spot breaks out.
-
-\subsection{Master PDE Interrelationship: The No-Arbitrage Carry Link}
-\label{subsec:greek_master_pde}
-
-The fundamental Greeks are unified through the Black-Scholes Partial Differential Equation:
+The fundamental Greeks are tied together through the Black-Scholes Partial Differential Equation:
 \begin{equation}
     \Theta + \frac{1}{2} \sigma^2 S^2 \Gamma + r S \Delta - r V = 0
     \label{eq:master_greek_pde}
 \end{equation}
 
-\noindent
-\textbf{Trader's Financial Intuition:}
-The BSM PDE represents the fundamental balance sheet of an options market maker. Setting the risk-free rate $r \approx 0$ for short intraday intervals yields the trade-off:
+Setting interest rates $r \approx 0$ for short intraday intervals yields the intuitive balance:
 \begin{equation}
     \Theta \approx -\frac{1}{2} \sigma^2 S^2 \Gamma
+    \label{eq:theta_gamma_tradeoff}
 \end{equation}
-This reveals that Theta decay and Gamma gains are exact economic mirror images. A delta-neutral portfolio cannot simultaneously collect positive time decay ($\Theta > 0$) and maintain positive convexity ($\Gamma > 0$). If an options desk collects theta rent by writing short options, it is mathematically forced to accept negative gamma, suffering explosive rebalancing losses during sharp market rallies or crashes.
+
+\noindent
+\textbf{Trader's Financial Intuition:}
+Equation \eqref{eq:theta_gamma_tradeoff} represents the fundamental economic balance sheet of an options desk. It proves that **Theta decay and Gamma gains are exact economic mirror images**. A delta-neutral trading book cannot simultaneously make money from time decay ($\Theta > 0$) and make money from market volatility ($\Gamma > 0$). If an options desk collects theta rent by selling options, it is mathematically forced to accept negative gamma, suffering rebalancing losses during sharp market rallies or crashes.
 
 \section{Numerical Inversion of Implied Volatility: Newton-Raphson Engine}
 \label{sec:iv_inversion_algorithm}
 
-Because the volatility parameter $\sigma$ enters non-linearly into the cumulative normal integrals $N(d_1)$ and $N(d_2)$, the BSM formula cannot be algebraically inverted. To extract the market's forward-looking implied volatility $\sigma_{\text{implied}}$, the system finds the root of the pricing objective:
+Because the volatility parameter $\sigma$ enters non-linearly into the normal cumulative distributions $N(d_1)$ and $N(d_2)$, the BSM formula cannot be algebraically inverted. To extract the market's forward-looking implied volatility $\sigma_{\text{implied}}$, the system solves:
 \begin{equation}
     f(\sigma) \equiv C_{\text{BSM}}(S, K, \tau, r, \sigma) - C_{\text{market}} = 0
 \end{equation}
-Using the Newton-Raphson iterative scheme where $f'(\sigma) = \frac{\partial C_{\text{BSM}}}{\partial \sigma} = \nu(S, K, \tau, r, \sigma)$ (Vega):
+using Newton-Raphson iteration, where the derivative $f'(\sigma) = \frac{\partial C_{\text{BSM}}}{\partial \sigma} = \nu$ (Vega):
 \begin{equation}
     \sigma_{n+1} = \sigma_n - \frac{C_{\text{BSM}}(S, K, \tau, r, \sigma_n) - C_{\text{market}}}{\nu(S, K, \tau, r, \sigma_n)}
     \label{eq:newton_raphson_iv}
 \end{equation}
-where:
-\begin{itemize}
-    \item $\sigma_n$: Implied volatility estimate at iteration step $n$.
-    \item $C_{\text{BSM}}(\sigma_n) - C_{\text{market}}$: Pricing residual between model valuation and live market price.
-    \item $\nu(\sigma_n)$: Option Vega, providing the exact local slope of price with respect to volatility.
-\end{itemize}
+where $\sigma_n$ is the volatility estimate at step $n$, $\Delta C = C_{\text{BSM}} - C_{\text{market}}$ is the pricing error, and $\nu$ is option Vega acting as the local slope.
 
 \noindent
 \textbf{Trader's Financial Intuition:}
-Newton-Raphson uses the option's Vega as the tangent slope to update the volatility estimate: if an option is trading \rupee 2.0 higher than the BSM theoretical value and its Vega is $10.0$, the algorithm raises the volatility estimate by $2.0 / 10.0 = 0.20$ percentage points in the subsequent step. 
+Newton-Raphson updates volatility estimates by dividing the price error by Vega: if an option trades \rupee 2.0 above theoretical value and Vega is $10.0$, the algorithm raises the volatility estimate by $2.0 / 10.0 = 0.20$ percentage points in the next step. 
 \begin{itemize}
-    \item \textbf{Numerical Divergence Trap:} When contracts approach expiration ($\tau \to 0$) or move deep out-of-the-money, Vega approaches zero ($\nu \to 0$). Dividing by near-zero causes the Newton-Raphson step to diverge wildly toward infinity. Production systems must implement lower bounds on Vega ($\nu > 10^{-7}$) and fall back to bounded Brent bisection during near-expiry sessions.
+    \item \textbf{Numerical Divergence Trap:} When contracts approach expiration ($\tau \to 0$), Vega collapses toward zero ($\nu \to 0$). Dividing by near-zero causes standard Newton-Raphson to diverge wildly. The production engine implements lower bounds on Vega ($\nu > 10^{-7}$) and falls back to bounded Brent bisection during near-expiry sessions.
 \end{itemize}
 
-Algorithm \ref{alg:newton_raphson_iv} outlines the production implementation of the numerical inversion engine.
+Algorithm \ref{alg:newton_raphson_iv} presents the production numerical inversion routine.
 
 \begin{algorithm}[H]
 \caption{Newton-Raphson Implied Volatility Numerical Inversion}
@@ -168,13 +88,13 @@ Algorithm \ref{alg:newton_raphson_iv} outlines the production implementation of 
 \begin{algorithmic}[1]
 \Require Spot $S$, Strike $K$, Expiry $\tau$, Rate $r$, Price $C_{\text{market}}$, Tol $\epsilon = 10^{-6}$, Max Iter $N_{\max} = 100$
 \Ensure Implied Volatility $\sigma_{\text{implied}}$
-\State \textbf{if} $C_{\text{market}} < \max(0, S - K e^{-r\tau})$ \textbf{then return} $\text{NaN}$ \Comment{Intrinsic arbitrage violation}
-\State Initialize: $\sigma_0 \gets \sqrt{2\pi / \tau} \cdot (C_{\text{market}} / S)$ \Comment{Brenner-Subrahmanyam approximation}
+\State \textbf{if} $C_{\text{market}} < \max(0, S - K e^{-r\tau})$ \textbf{then return} $\text{NaN}$ \Comment{Check intrinsic boundary}
+\State Initialize: $\sigma_0 \gets \sqrt{2\pi / \tau} \cdot (C_{\text{market}} / S)$ \Comment{Brenner-Subrahmanyam seed}
 \For{$n = 0$ \textbf{to} $N_{\max}$}
-    \State Compute $d_1, d_2$ via Eq. \eqref{eq:d1_d2_alg}; $C_{\text{model}} \gets S N(d_1) - K e^{-r\tau} N(d_2)$
-    \State Compute error $\Delta C \gets C_{\text{model}} - C_{\text{market}}$; \textbf{if} $|\Delta C| < \epsilon$ \textbf{then return} $\sigma_n$
+    \State Compute $C_{\text{model}} \gets \text{BSM\_Call}(S, K, \tau, r, \sigma_n)$; error $\Delta C \gets C_{\text{model}} - C_{\text{market}}$
+    \State \textbf{if} $|\Delta C| < \epsilon$ \textbf{then return} $\sigma_n$ \Comment{Convergence achieved}
     \State Compute Vega $\nu \gets S \sqrt{\tau} N'(d_1)$; \textbf{if} $\nu < 10^{-7}$ \textbf{then} fall back to Brent bisection
-    \State $\sigma_{n+1} \gets \sigma_n - \Delta C / \nu$
+    \State $\sigma_{n+1} \gets \sigma_n - \Delta C / \nu$ \Comment{Newton-Raphson update}
 \EndFor
 \State \Return $\sigma_{N_{\max}}$
 \end{algorithmic}
@@ -183,62 +103,58 @@ Algorithm \ref{alg:newton_raphson_iv} outlines the production implementation of 
 \section{Predictive Model Formulations}
 \label{sec:predictive_models_math}
 
-The target of the predictive modeling suite is the 5-minute-ahead change in implied volatility:
+The primary objective of the predictive pipeline is forecasting the 5-minute-ahead change in implied volatility:
 \begin{equation}
     \Delta \text{IV}_{t+5} = \text{IV}_{t+5} - \text{IV}_t
 \end{equation}
-where $\text{IV}_t$ is the prevailing annualized market implied volatility at time $t$. Four comparative predictive architectures are formulated:
+where $\text{IV}_t$ is the prevailing annualized market implied volatility at time $t$. Four comparative model architectures are evaluated:
 
 \begin{enumerate}
-    \item \textbf{Persistence Benchmark (Random Walk):}
+    \item \textbf{Persistence Benchmark (Random Walk Baseline):}
     \begin{equation}
         \widehat{\Delta \text{IV}}_{t+5} = 0 \iff \widehat{\text{IV}}_{t+5} = \text{IV}_t
     \end{equation}
-    \textit{Intuition:} Assumes implied volatility is stationary over short 5-minute intervals. Any predictive model must outperform this benchmark to demonstrate genuine predictive utility.
+    \textit{Concept:} Assumes implied volatility remains stationary over the 5-minute forecast horizon. In liquid markets, beating this benchmark is notoriously difficult due to extreme short-term autocorrelation.
 
-    \item \textbf{Ordinary Least Squares (OLS) Linear Model:}
+    \item \textbf{Ordinary Least Squares (OLS) Linear Baseline:}
     \begin{equation}
         \mathbf{y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\epsilon}, \quad \widehat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{y}
     \end{equation}
-    \textit{Intuition:} Fits a global linear hyperplane across all features. Fails completely ($R^2 = -0.2410$) because it cannot accommodate parabolic smile curvature across moneyness ($K/S$) or regime shifts.
+    \textit{Concept:} Fits a standard linear regression model. As shown in empirical testing, OLS fails completely ($R^2 = -0.2410$) because a linear hyperplane cannot accommodate parabolic smile curvature across moneyness space ($K/S$).
 
     \item \textbf{Random Forest Regressor (Non-Parametric Bagging):}
     \begin{equation}
         \widehat{y}_{\text{RF}}(\mathbf{x}) = \frac{1}{B} \sum_{b=1}^B T_b(\mathbf{x})
     \end{equation}
-    \textit{Intuition:} Averages $B = 100$ decorrelated decision trees trained on bootstrap data partitions. By taking random feature subsets ($m_{\text{try}} = \sqrt{p}$) at each split, it drastically dampens variance, filtering out high-frequency quote noise.
+    \textit{Concept:} Averages $B = 100$ decorrelated regression trees trained on bootstrap samples. By evaluating random feature subsets at each split, the ensemble dampens prediction variance and filters out high-frequency bid-ask quote noise.
 
     \item \textbf{XGBoost Regressor (Gradient Boosted Trees):}
-    \begin{equation}
-        \mathcal{L}^{(t)} = \sum_{i=1}^N \left[ g_i f_t(\mathbf{x}_i) + \frac{1}{2} h_i f_t^2(\mathbf{x}_i) \right] + \gamma T_{\text{leaves}} + \frac{1}{2}\lambda \sum_{j=1}^{T_{\text{leaves}}} w_j^2
-    \end{equation}
-    \textit{Intuition:} Builds trees sequentially to minimize residual loss using second-order Taylor gradients ($g_i$) and Hessians ($h_i$).
+    \textit{Concept:} Constructs decision trees sequentially in an additive stage-wise manner, optimizing first- and second-order loss gradients with $L_1$ and $L_2$ leaf regularization to capture complex non-linear feature interactions.
 \end{enumerate}
 
-\section{Conviction Thresholding, Valuation Spread \& Stress Framework}
+\section{Downstream Quantitative Valuation \& Risk Frameworks}
 \label{sec:downstream_formulations}
 
 \subsection{Directional Conviction Gating}
 \label{sec:conviction_thresholding_math}
 
-To eliminate low-conviction noise churn, forecasts are filtered by an absolute magnitude conviction threshold $\theta$:
+To prevent excessive trade churn on low-conviction signals, predictions are filtered by an absolute magnitude conviction threshold $\theta$:
 \begin{equation}
     \mathcal{S}_\theta = \left\{ i \;\middle|\; \left|\widehat{\Delta \text{IV}}_{t+5, i}\right| \ge \theta \right\}, \quad \text{HitRate}(\theta) = \frac{1}{|\mathcal{S}_\theta|} \sum_{i \in \mathcal{S}_\theta} \mathbb{I}\left( \text{sgn}(\widehat{\Delta \text{IV}}_i) == \text{sgn}(\Delta \text{IV}_i) \right)
 \end{equation}
-where $\theta$ represents the minimum expected volatility displacement required to justify trade entry.
 
 \noindent
 \textbf{Trader's Financial Intuition:}
-Small predicted volatility changes ($|\widehat{\Delta \text{IV}}| < 0.10$) are frequently dominated by bid-ask bounce and execution slippage. Setting $\theta = 0.10$ IV points acts as an institutional gatekeeper: it filters out 82\% of noisy, low-edge setups while escalating directional hit-rate from a coin-toss 53.20\% to **63.40\%**, ensuring desks trade only when edge exceeds execution costs.
+Minor predicted volatility changes ($|\widehat{\Delta \text{IV}}| < 0.10$) are often consumed by bid-ask spread friction. Gating execution at $\theta = 0.10$ IV points eliminates 82\% of noise churn while escalating directional hit-rate from 53.20\% to **63.40\%**, ensuring desks trade only when expected alpha exceeds execution costs.
 
 \subsection{Relative IV Valuation Engine}
 \label{sec:relative_iv_valuation_math}
 
-The **Valuation Spread** quantifies contract mispricing by comparing prevailing market IV against the model's 5-minute forecast:
+The **Valuation Spread** quantifies relative mispricing by comparing market IV against model forecast:
 \begin{equation}
     \text{Spread}_i = \text{IV}_{t, i} - \widehat{\text{IV}}_{t+5, i} = -\widehat{\Delta \text{IV}}_{t+5, i}
 \end{equation}
-Contracts are categorized into three systematic regimes using a $\delta_{\text{val}} = 0.50$ point boundary:
+Contracts are partitioned using a $\delta_{\text{val}} = 0.50$ point boundary:
 \begin{equation}
     \text{Regime Tag}_i = \begin{cases}
         \textbf{High IV (Rich / Overvalued)}, & \text{Spread}_i > +0.50 \implies \text{Credit Spreads / Short Volatility} \\
@@ -248,22 +164,14 @@ Contracts are categorized into three systematic regimes using a $\delta_{\text{v
 \end{equation}
 
 \noindent
-\textbf{Trader's Financial Intuition:}
-If a contract trades at an implied volatility of $18.5\%$ but the machine learning ensemble forecasts that fair short-term IV is $17.5\%$ ($\text{Spread} = +1.0$), the contract is economically **Rich / Overvalued**. Option desks exploit this by writing credit spreads to capture IV compression. Conversely, if a contract trades at $12.0\%$ but is forecast to rise to $13.2\%$ ($\text{Spread} = -1.2$), the contract is **Cheap / Undervalued**, signaling long debit spreads.
+\textbf{Important Clarification on Valuation Semantics:}
+The terms *Overvalued* and *Undervalued* are classifications **relative to the model's 5-minute forecasted implied volatility**, not claims that an option violates absolute no-arbitrage bounds. When market IV exceeds model expectations by $> 0.50$ points, volatility is projected to compress, favoring credit spread structures. When market IV trades at a discount $> 0.50$ points below forecast, expansion is expected, favoring long debit spreads.
 
 \subsection{Multi-Factor Scenario Stress Matrix}
 \label{sec:scenario_simulation_math}
 
-To assess non-linear risks, contract values are stressed across a 3D grid $\mathcal{S} \times \Sigma \times \mathcal{T}$ ($S \pm 2\%, \sigma \pm 20\%, \Delta\tau \in [0, 24\text{h}]$):
+To evaluate non-linear portfolio risks, contract values are stressed across a 3D grid $\mathcal{S} \times \Sigma \times \mathcal{T}$ ($S \pm 2\%, \sigma \pm 20\%, \Delta\tau \in [0, 24\text{h}]$):
 \begin{equation}
     \widetilde{V}_{k, m, j} = V_{\text{BSM}}(S_k, K, \tau_j, r, \sigma_m), \quad \Delta P\&L\% = \frac{\widetilde{V}_{k, m, j} - V_0}{V_0} \times 100\%
 \end{equation}
-where $V_0$ is the baseline contract valuation under prevailing market parameters.
-
-\noindent
-\textbf{Trader's Financial Intuition:}
-Linear Greeks assume infinitesimal moves, failing during market gaps. The multi-factor stress matrix evaluates the full non-linear Taylor surface:
-\begin{equation}
-    \Delta V \approx \Delta \cdot \Delta S + \frac{1}{2}\Gamma \cdot (\Delta S)^2 + \nu \cdot \Delta\sigma + \Theta \cdot \Delta t + \text{Vanna} \cdot \Delta S \Delta\sigma + \dots
-\end{equation}
-This allows risk managers to verify whether a portfolio can survive joint adverse shocks (e.g., a $-2\%$ index crash coupled with a $+20\%$ IV spike and 6 hours of overnight theta decay).
+where $V_0$ represents the baseline contract value under prevailing market parameters. This allows risk managers to verify whether a portfolio can survive joint adverse shocks (e.g., an index crash coupled with a volatility spike and overnight theta decay).
