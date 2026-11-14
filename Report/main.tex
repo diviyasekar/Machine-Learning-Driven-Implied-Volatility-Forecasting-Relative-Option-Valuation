@@ -120,15 +120,19 @@
 % =========================================================
 % LAYOUT & HEADER/FOOTER CONFIGURATIONS
 % =========================================================
-\setstretch{1.10}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\textcolor{charcoal}{\small\nouppercase{\leftmark}}}
-\fancyhead[R]{\textcolor{charcoal}{\small\thepage}}
-\renewcommand{\headrule}{\hbox to\headwidth{\color{headergray}\leaders\hrule height 0.4pt\hfill}}
-\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
-\setlength{\headheight}{24pt}
-\addtolength{\topmargin}{-14pt}
+\fancyhead{} % No header on any page
+\renewcommand{\headrulewidth}{0pt} % No header rule line
+\fancyfoot[C]{\textcolor{charcoal}{\small\thepage}} % Page number on downside middle of every page
+
+% Ensure plain pages (e.g., chapter start pages, front matter) follow the exact same format
+\fancypagestyle{plain}{%
+    \fancyhf{}%
+    \fancyhead{}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \fancyfoot[C]{\textcolor{charcoal}{\small\thepage}}%
+}
 
 % Float Spacing Refinements
 \setlength{\floatsep}{8pt plus 2pt minus 2pt}
