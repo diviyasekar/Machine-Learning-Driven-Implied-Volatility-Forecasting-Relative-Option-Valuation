@@ -1,0 +1,115 @@
+\chapter{Theoretical Foundations \& Literature Survey}
+\label{chap:literature_survey}
+
+\section{The Theoretical Evolution of Option Pricing}
+\label{sec:option_pricing_evolution}
+
+The mathematical modeling of financial derivatives traces its origin to the seminal doctoral dissertation of Louis Bachelier in 1900, who proposed modeling stock price movements as an arithmetic Brownian motion. While pioneering the concept of continuous-time stochastic processes in economics, Bachelier's model permitted negative asset prices and failed to capture proportional returns. Subsequent contributions by Sprenkle (1961), Boness (1964), and Samuelson (1965) addressed these limitations by proposing that asset prices follow a \textbf{Geometric Brownian Motion (GBM)}, ensuring non-negative prices and log-normal return distributions.
+
+The decisive breakthrough in modern derivative asset pricing occurred in 1973 with the publication of the canonical Black-Scholes-Merton model by Fischer Black, Myron Scholes \cite{black1973pricing}, and Robert Merton \cite{merton1973theory}. The foundational insight of the Black-Scholes-Merton (BSM) framework was the construction of a continuously rebalanced, risk-free hedging portfolio consisting of a long position in the underlying stock and a short position in the derivative option. By applying It\^o's Lemma under the assumption of continuous trading and no transaction costs, the stochastic term driving the asset price cancels out identically, yielding a deterministic partial differential equation:
+\begin{equation}
+    \frac{\partial V}{\partial t} + \frac{1}{2} \sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + r S \frac{\partial V}{\partial S} - r V = 0
+    \label{eq:bsm_pde_lit}
+\end{equation}
+where $V(S, t)$ denotes the option value, $S$ is the spot price of the underlying asset, $\sigma$ is the instantaneous asset return volatility, and $r$ is the continuously compounded risk-free interest rate.
+
+The closed-form solutions for a European call option $C(S_t, K, \tau)$ and a European put option $P(S_t, K, \tau)$ maturing at time $T$ with time-to-expiry $\tau = T - t$ and strike price $K$ are given by:
+\begin{equation}
+    C(S_t, K, \tau) = S_t N(d_1) - K e^{-r\tau} N(d_2)
+    \label{eq:bsm_call_lit}
+\end{equation}
+\begin{equation}
+    P(S_t, K, \tau) = K e^{-r\tau} N(-d_2) - S_t N(-d_1)
+    \label{eq:bsm_put_lit}
+\end{equation}
+where $N(\cdot)$ represents the standard normal cumulative distribution function, and the normalized distance variables $d_1$ and $d_2$ are defined as:
+\begin{equation}
+    d_1 = \frac{\ln(S_t / K) + \left(r + \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}, \quad d_2 = d_1 - \sigma \sqrt{\tau}
+\end{equation}
+
+The mathematical elegance of the BSM model rests upon several restrictive assumptions: (1) \textbf{Geometric Brownian Motion} ($dS_t = \mu S_t dt + \sigma S_t dW_t$ with constant drift $\mu$ and volatility $\sigma$), (2) \textbf{Frictionless Markets} (zero transaction costs, bid-ask spreads, or short-sale constraints), (3) \textbf{Continuous Trading} (unbounded infinitesimal portfolio rebalancing), and (4) \textbf{Constant Parameters} (constant risk-free rate $r$ and volatility $\sigma$). While BSM remains the universal benchmark of global derivatives exchanges, these assumptions are systematically violated in empirical market data.
+
+\section{The Implied Volatility Surface: Smile, Skew, and Term Structure}
+\label{sec:iv_surface_dynamics}
+
+In empirical trading, volatility $\sigma$ cannot be directly observed. Instead, traders invert the BSM formula numerically using prevailing option market transaction prices $C_{\text{market}}$ to extract the \textbf{Implied Volatility ($\sigma_{\text{implied}}$)}:
+\begin{equation}
+    C_{\text{market}} - C_{\text{BSM}}(S_t, K, \tau, r, \sigma_{\text{implied}}) = 0
+\end{equation}
+
+If the BSM model held strictly, inverting across strikes $K$ and expiries $T$ would yield a flat plane. However, following the 1987 crash, empirical option prices began displaying persistent strike dependence, termed the \textbf{Volatility Smile} (or \textbf{Skew} in index options) \cite{hull2018options, gatheral2006volatility}. The cross-sectional dependence of IV on moneyness $M = K / S$ and time-to-expiry $\tau$ yields the 3D \textbf{Implied Volatility Surface}, $\sigma_{\text{implied}}(K, \tau)$, governed by three stylized regularities:
+\begin{itemize}
+    \item \textbf{Pronounced Negative Skew:} Out-of-the-money puts trade at higher IV than OTM calls, reflecting market demand for downside insurance (crashophobia) and the leverage effect.
+    \item \textbf{Smile Curvature (Convexity):} OTM and ITM wings exhibit elevated IV relative to ATM contracts, reflecting leptokurtic return distributions with fat tails (excess kurtosis).
+    \item \textbf{Term Structure Dynamics:} In calm regimes, IV curves upward with maturity (contango); in panic regimes, short-term IV spikes above long-term IV (backwardation).
+\end{itemize}
+
+Seminal contributions to resolve the volatility smile within continuous-time diffusion include the \textbf{Local Volatility} models of Dupire (1994) and Derman and Kani \cite{derman1994riding}, which define volatility as a deterministic function of spot and time, $\sigma(S, t)$. However, local volatility predicts counter-empirical smile flattening as spot moves. In response, \textbf{Stochastic Volatility} models—notably Heston \cite{heston1993closed}—introduced a secondary Brownian motion driving variance:
+\begin{equation}
+    dS_t = \mu S_t dt + \sqrt{v_t} S_t dW_t^S, \quad dv_t = \kappa (\theta - v_t) dt + \xi \sqrt{v_t} dW_t^v
+\end{equation}
+with correlation $\mathbb{E}[dW_t^S dW_t^v] = \rho dt$. A negative correlation $\rho < 0$ generates downward index skew, while vol-of-vol $\xi$ generates smile curvature. Despite theoretical elegance, continuous-time stochastic models are heavily parameterized, slow to recalibrate intraday, and unable to ingest discrete limit order book microstructure.
+
+\section{Econometric Approaches to Volatility Modeling}
+\label{sec:econometric_approaches}
+
+Before machine learning, econometricians modeled time-series volatility through parametric discrete-time processes, founded by Robert Engle's \textbf{ARCH} model \cite{engle1982autoregressive} and generalized by Tim Bollerslev into \textbf{GARCH} \cite{bollerslev1986generalized}. Under standard $\text{GARCH}(1,1)$, conditional variance $\sigma_t^2$ of asset returns $r_t = \sigma_t \epsilon_t$ evolves according to:
+\begin{equation}
+    \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2
+    \label{eq:garch11}
+\end{equation}
+subject to $\omega > 0$, $\alpha \ge 0$, $\beta \ge 0$, and stationarity $\alpha + \beta < 1$. Here $\alpha$ captures reaction to recent shocks, while $\beta$ captures persistence. In high-frequency finance, Andersen, Bollerslev, Diebold, and Labys \cite{andersen2003modeling} showed that aggregating intraday squared returns into \textbf{Realized Volatility (RV)}, $\text{RV}_t = \sum_{i=1}^{M} r_{t, i}^2$, provides a model-free metric of integrated variance.
+
+However, GARCH and RV model physical volatility $\mathbb{P}$, rather than the risk-neutral surface $\mathbb{Q}$ embedded in option prices. In contrast, Cont and da Fonseca \cite{cont2002dynamics} applied Karhunen-Lo\`eve expansions (PCA) to empirical surfaces, demonstrating that over 90\% of daily surface variance decomposes into three orthogonal modes: (1) \textbf{Level Shift} (parallel shift across strikes/maturities), (2) \textbf{Slope / Skew Shift} (smile rotation between OTM puts and calls), and (3) \textbf{Curvature / Convexity Shift} (wing elevation relative to ATM). While insightful, PCA assumes static linear relationships and lacks the high-frequency temporal granularity needed for intraday 5-minute algorithmic execution.
+
+\section{Machine Learning \& Non-Parametric Ensembles in Derivatives}
+\label{sec:ml_in_derivatives}
+
+Over the past decade, financial institutions have increasingly adopted non-parametric machine learning architectures for derivatives modeling \cite{lopez2018advances}. Machine learning models provide: (1) \textit{Model-Free Flexibility} without rigid diffusion assumptions, (2) \textit{High-Dimensional Feature Ingestion} across strike geometries, momentum, and microstructure variables, and (3) \textit{Non-Linear Interaction Capture} across moneyness and liquidity regimes. Among supervised paradigms, tree ensembles have established a dominant empirical track record in tabular financial time series.
+
+\subsection{Random Forests}
+Introduced by Leo Breiman in 2001 \cite{breiman2001random}, \textbf{Random Forests} construct an ensemble of decorrelated decision trees using bootstrap aggregating (bagging) and random feature subspace selection. Given training data $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$, the algorithm draws $B$ bootstrap samples $\mathcal{D}_b$, growing unpruned regression trees $T_b(\mathbf{x})$ by choosing split $(j, s)$ minimizing MSE impurity:
+\begin{equation}
+    \arg\min_{j, s} \left[ \sum_{i \in R_1(j, s)} (y_i - \bar{y}_{R_1})^2 + \sum_{i \in R_2(j, s)} (y_i - \bar{y}_{R_2})^2 \right]
+\end{equation}
+
+The ensemble prediction is the arithmetic mean across all $B$ trees:
+\begin{equation}
+    \widehat{y}_{\text{RF}}(\mathbf{x}) = \frac{1}{B} \sum_{b=1}^{B} T_b(\mathbf{x})
+    \label{eq:rf_ensemble_lit}
+\end{equation}
+
+The power of Random Forests in noisy financial markets stems from variance reduction. For tree variance $\sigma^2$ and average pairwise tree correlation $\rho_{\text{tree}}$, the ensemble variance is:
+\begin{equation}
+    \text{Var}(\widehat{y}_{\text{RF}}) = \rho_{\text{tree}} \sigma^2 + \frac{1 - \rho_{\text{tree}}}{B} \sigma^2
+\end{equation}
+As $B \to \infty$, the second term vanishes, reducing variance to $\rho_{\text{tree}} \sigma^2$. Random feature subsampling depresses $\rho_{\text{tree}}$, maximizing generalization without increasing bias.
+
+\subsection{Gradient Boosted Decision Trees (XGBoost)}
+In contrast to bagging, **Gradient Boosting** builds trees sequentially in an additive, forward stage-wise manner. Proposed by Chen and Guestrin in 2016 \cite{chen2016xgboost}, \textbf{XGBoost} minimizes a regularized objective combining convex loss $l$ and complexity penalty $\Omega$:
+\begin{equation}
+    \mathcal{L}^{(t)} = \sum_{i=1}^N l\left(y_i, \widehat{y}_i^{(t-1)} + f_t(\mathbf{x}_i)\right) + \gamma T_{\text{leaves}} + \frac{1}{2}\lambda \sum_{j=1}^{T_{\text{leaves}}} w_j^2
+\end{equation}
+By taking a second-order Taylor expansion around $\widehat{y}_i^{(t-1)}$, XGBoost incorporates first-order gradients ($g_i$) and second-order Hessian curvatures ($h_i$), enabling rapid optimization and robust regularization.
+
+\section{Market Microstructure, Limit Order Books, and Intraday Liquidity}
+\label{sec:market_microstructure}
+
+Prices on electronic exchanges are generated through continuous auction mechanisms in \textbf{Limit Order Books (LOB)} \cite{hasbrouck2007empirical, bouchaud2003theory}. At time $t$, the state of an option's order book is defined by standing limit bids and asks. The \textbf{Bid-Ask Spread} represents the instantaneous cost of liquidity immediacy:
+\begin{equation}
+    \text{Spread}_t = \text{Ask}_t - \text{Bid}_t
+\end{equation}
+In market microstructure, the spread serves as a proxy for: (1) \textit{Order Processing Costs} of liquidity providers, (2) \textit{Inventory Holding Risk} from unhedged positions, and (3) \textit{Adverse Selection} against informed traders \cite{glosten1985bid}. In high-frequency options, sudden spread widening frequently precedes sharp implied volatility adjustments. Incorporating spreads and lags directly into the feature space provides early warnings of liquidity withdrawal. Furthermore, near expiration, dealers face **Pin Risk**—uncertainty over whether ATM options will expire in or out of the money—causing massive delta rebalancing that renders continuous-time hedging physically unviable.
+
+\section{Identification of the Research Gap}
+\label{sec:research_gap}
+
+A systematic review of the derivatives literature highlights four critical research gaps:
+\begin{enumerate}
+    \item \textbf{Scarcity of Ultra-High-Frequency (5-Minute) IV Studies:} Most published research examines daily or monthly horizons; empirical models forecasting 5-minute implied volatility changes across cross-sectional option chains in emerging markets remain rare.
+    \item \textbf{Unrealistic Benchmark Evaluations:} Many studies rely on randomized cross-validation that leaks future temporal data, and rarely benchmark against the formidable **Persistence Random Walk** ($\widehat{\text{IV}}_{t+5} = \text{IV}_t$).
+    \item \textbf{Lack of Operational Valuation Translation:} Pure ML research often terminates at error metrics (MAE/RMSE) without converting predictions into economic signals (rich/cheap valuation screeners or scenario stress grids).
+    \item \textbf{Neglect of the Expiry-Day Boundary Discontinuity:} Literature regularly assumes stationary dynamics throughout the contract lifecycle, neglecting the severe performance collapse occurring in the hyper-gamma, vanishing-vega final hours of expiry.
+\end{enumerate}
+
+This study bridges these gaps by developing a complete quantitative system combining automated Upstox API harvesting, strict chronological benchmarking, conviction gating, relative valuation screener mechanics, and econometric analysis of the expiry-day regime collapse.

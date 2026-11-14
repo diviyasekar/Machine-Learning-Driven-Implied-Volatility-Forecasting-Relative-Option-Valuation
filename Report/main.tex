@@ -1,0 +1,428 @@
+\documentclass[11pt,oneside]{report}
+
+% =========================================================
+% PACKAGES
+% =========================================================
+\usepackage[margin=0.80in,top=0.80in,bottom=0.80in]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,multirow,longtable}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage{color,xcolor}
+\usepackage{pdfpages}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, arrows.meta, positioning, calc}
+\usepackage[pdftex,bookmarksnumbered=true,colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
+\usepackage{bookmark}
+
+% =========================================================
+% DOCUMENT METADATA
+% =========================================================
+\hypersetup{
+    pdftitle={Machine-Learning-Driven Implied Volatility Forecasting and Relative Option Valuation: An Empirical Study on NIFTY 50 Weekly Index Options},
+    pdfauthor={Diviya C.},
+    pdfsubject={Corporate Internship Report (MSQF 534)},
+    pdfkeywords={Implied Volatility, Black-Scholes-Merton, Random Forest, XGBoost, Persistence Benchmark, Option Valuation, Scenario Stress Testing, Expiry Day Regime Shift, NIFTY 50 Options}
+}
+
+% =========================================================
+% GRAPHICS PATH
+% =========================================================
+\graphicspath{{figures/}{./}}
+
+% =========================================================
+% CUSTOM COLORS & LISTINGS STYLING
+% =========================================================
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0,0,0.8}
+\definecolor{backgroundcolor}{rgb}{0.97,0.97,0.97}
+\definecolor{charcoal}{rgb}{0.2,0.2,0.2}
+\definecolor{headergray}{rgb}{0.7,0.7,0.7}
+\definecolor{commentgray}{rgb}{0.5,0.5,0.5}
+
+% Currency Command
+\newcommand{\rupee}{\text{Rs.\ }}
+
+\lstset{
+    backgroundcolor=\color{backgroundcolor},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codegreen},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+% =========================================================
+% LAYOUT & HEADER/FOOTER CONFIGURATIONS
+% =========================================================
+\setstretch{1.10}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{charcoal}{\small\nouppercase{\leftmark}}}
+\fancyhead[R]{\textcolor{charcoal}{\small\thepage}}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{headergray}\leaders\hrule height 0.4pt\hfill}}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\setlength{\headheight}{24pt}
+\addtolength{\topmargin}{-14pt}
+
+% Float Spacing Refinements
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowcaptionskip}{4pt plus 1pt minus 1pt}
+
+% Algorithmic Styling Refinements
+\renewcommand{\algorithmiccomment}[1]{\hfill\textcolor{commentgray}{\ensuremath{\triangleright}\ \textit{#1}}}
+
+% Chapter Title Spacing
+\titleformat{\chapter}[display]
+  {\normalfont\large\bfseries}{\chaptername\ \thechapter}{4pt}{\Large}
+\titlespacing*{\chapter}{0pt}{-14pt}{10pt}
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+\titlespacing*{\subsection}{0pt}{6pt}{3pt}
+
+% Paragraph Spacing
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{1.3em}
+
+% Float Layout Optimization
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.85}
+
+\begin{document}
+
+% =========================================================
+% TITLE PAGE
+% =========================================================
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+    \begin{center}
+        \vspace*{0.2cm}
+        
+        \textbf{\large PONDICHERRY UNIVERSITY} \\[0.2cm]
+        \textbf{\large RAMANUJAN SCHOOL OF MATHEMATICAL SCIENCES} \\[0.2cm]
+        \textbf{\large DEPARTMENT OF STATISTICS} \\[0.35cm]
+        
+        \includegraphics[width=0.22\textwidth]{pondicherry_university_logo} \\[0.35cm]
+        
+        \textbf{\large M.Sc. QUANTITATIVE FINANCE} \\[0.2cm]
+        \textbf{\large MSQF 534: Corporate Internship} \\[0.2cm]
+        \textbf{\large REPORT ON} \\[0.35cm]
+        
+        \textbf{\Large Machine-Learning-Driven Implied Volatility Forecasting \& Relative Option Valuation} \\[0.25cm]
+        {\large An Empirical Study on NIFTY 50 Weekly Index Options \par}
+        \vspace{0.6cm}
+        
+        \textbf{\large SUBMITTED BY} \\[0.4cm]
+        
+        \textbf{\large NAME: DIVIYA C.} \\[0.2cm]
+        \textbf{\large REG. NO.: 25MSQUFPY0018} \\[0.6cm]
+        
+        \textbf{\large UNDER THE GUIDANCE OF} \\[0.2cm]
+        \textbf{\normalsize Surabhi Investment Services Pvt. Ltd., Tiruchirappalli, Tamil Nadu} \\[0.7cm]
+        
+        \textbf{\large NOVEMBER 2026}
+        
+    \end{center}
+\end{titlepage}
+
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+\pagestyle{plain}
+
+% =========================================================
+% UNIVERSITY CERTIFICATE PAGE
+% =========================================================
+\newpage
+\thispagestyle{plain}
+\phantomsection
+\addcontentsline{toc}{chapter}{University Certificate}
+\begin{center}
+    \includegraphics[width=0.20\textwidth]{pondicherry_university_logo} \\[0.3cm]
+    \textbf{\large PONDICHERRY UNIVERSITY} \\[0.15cm]
+    \textbf{\large RAMANUJAN SCHOOL OF MATHEMATICAL SCIENCES} \\[0.15cm]
+    \textbf{\large DEPARTMENT OF STATISTICS} \\[0.4cm]
+    
+    \textbf{\large CERTIFICATE} \\[0.6cm]
+\end{center}
+
+\noindent
+Certified to be the bonafide record of work done in \textbf{MSQF 534: Corporate Internship} by \underline{\textbf{DIVIYA C.\vphantom{Q}}} with Register No. \underline{\textbf{25MSQUFPY0018}} of class \textbf{II M.Sc. Quantitative Finance} in the Department of Statistics, Ramanujan School of Mathematical Sciences, Pondicherry University, Puducherry -- 605 014, during the academic year 2026--2027.
+
+\vspace{1.5cm}
+\noindent
+\begin{minipage}{0.45\textwidth}
+    \begin{flushleft}
+        \rule{4.5cm}{0.4pt} \\
+        \textbf{Faculty - in - charge}
+    \end{flushleft}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \begin{flushright}
+        \rule{4.5cm}{0.4pt} \\
+        \textbf{Head / Coordinator}
+    \end{flushright}
+\end{minipage}
+
+\vspace{1.2cm}
+\noindent
+\textbf{Date:}
+
+\vspace{1.2cm}
+\noindent
+\textbf{Submitted for the M.Sc. Degree Practical Examination held on \rule{4cm}{0.4pt}.}
+
+\vspace{1.0cm}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \begin{flushright}
+        \rule{4.5cm}{0.4pt} \\
+        \textbf{Examiners}
+    \end{flushright}
+\end{minipage}
+
+% =========================================================
+% COMPANY INTERNSHIP CERTIFICATE
+% =========================================================
+\newpage
+\thispagestyle{plain}
+\phantomsection
+\addcontentsline{toc}{chapter}{Company Internship Certificate}
+\begin{center}
+    \vspace*{0.3cm}
+    \textbf{\LARGE SURABHI INVESTMENT SERVICES PVT. LTD.} \\[0.2cm]
+    \textbf{\large Quantitative Research \& Financial Derivatives Division} \\[0.1cm]
+    \textbf{\small Tiruchirappalli, Tamil Nadu, India} \\[0.5cm]
+    \rule{\textwidth}{1.2pt} \\[0.8cm]
+    
+    \textbf{\Large CERTIFICATE OF INTERNSHIP COMPLETION} \\[0.8cm]
+\end{center}
+
+\noindent
+This is to certify that \textbf{Ms. DIVIYA C.} (Register No. \textbf{25MSQUFPY0018}), a student of \textbf{M.Sc. Quantitative Finance}, Department of Statistics, Pondicherry University, has successfully completed her corporate internship project titled:
+
+\begin{center}
+    \vspace{0.2cm}
+    \textbf{\large ``Machine-Learning-Driven Implied Volatility Forecasting \& Relative Option Valuation''}
+    \vspace{0.2cm}
+\end{center}
+
+\noindent
+at \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu.
+
+\vspace{0.5cm}
+\noindent
+During the tenure of her internship, she demonstrated outstanding technical proficiency, analytical acumen, and rigorous quantitative problem-solving capabilities in financial econometrics, machine learning architectures, automated market data harvesting, and derivatives valuation. Her research contributed significantly to our options desk modeling frameworks, specifically in 5-minute ahead implied volatility forecasting, Black-Scholes scenario analysis, and expiry-day regime risk diagnostics.
+
+\vspace{0.5cm}
+\noindent
+Her conduct and work ethics during the project were exemplary. We wish her all success in her future academic and professional endeavors.
+
+\vspace{2.2cm}
+\noindent
+\begin{minipage}{0.45\textwidth}
+    \begin{flushleft}
+        \rule{4.5cm}{0.4pt} \\
+        \textbf{Managing Director / Research Head} \\
+        Surabhi Investment Services Pvt. Ltd.
+    \end{flushleft}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \begin{flushright}
+        \rule{4.5cm}{0.4pt} \\
+        \textbf{Project Mentor} \\
+        Quantitative Derivatives Desk
+    \end{flushright}
+\end{minipage}
+
+% If a scanned copy is available, uncomment:
+% \includepdf[pages=1,pagecommand={\thispagestyle{plain}\phantomsection\addcontentsline{toc}{chapter}{Internship Certificate}}]{internship_certificate.pdf}
+
+% =========================================================
+% DECLARATION & ACKNOWLEDGEMENTS
+% =========================================================
+\newpage
+\thispagestyle{plain}
+\phantomsection
+\addcontentsline{toc}{chapter}{Declaration \& Acknowledgements}
+\begin{center}
+    \textbf{\Large DECLARATION} \\[0.4cm]
+\end{center}
+
+\noindent
+I, \textbf{DIVIYA C.}, hereby declare that the corporate internship report titled \textbf{``Machine-Learning-Driven Implied Volatility Forecasting \& Relative Option Valuation: An Empirical Study on NIFTY 50 Weekly Index Options''} submitted to the Department of Statistics, Ramanujan School of Mathematical Sciences, Pondicherry University, in partial fulfillment of the requirements for the award of the degree of \textbf{Master of Science in Quantitative Finance}, is a record of original analytical work carried out by me under the institutional mentorship of \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu.
+
+\vspace{0.3cm}
+\noindent
+\begin{minipage}{0.4\textwidth}
+    \small
+    \textbf{Place:} Puducherry \\
+    \textbf{Date:} November 2026
+\end{minipage}
+\hfill
+\begin{minipage}{0.55\textwidth}
+    \begin{flushright}
+        \small
+        \textbf{DIVIYA C.} (Reg. No.: 25MSQUFPY0018) \\
+        Department of Statistics, Pondicherry University
+    \end{flushright}
+\end{minipage}
+
+\vspace{0.6cm}
+\begin{center}
+    \textbf{\Large ACKNOWLEDGEMENTS} \\[0.4cm]
+\end{center}
+
+\noindent
+I express my deepest gratitude to the Almighty for the guidance and perseverance to complete this research. I express my profound gratitude to the quantitative research leadership and mentors at \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu, for their invaluable domain mentorship in derivatives trading and market making. 
+
+\vspace{0.25cm}
+\noindent
+I extend my sincere appreciation to the \textbf{Head of the Department of Statistics} and the \textbf{Faculty Coordinator of M.Sc. Quantitative Finance}, Ramanujan School of Mathematical Sciences, Pondicherry University, as well as all esteemed faculty members, for their steadfast academic guidance. Finally, I dedicate this work to my beloved family and peers for their endless encouragement.
+
+\vspace{0.4cm}
+\hfill
+\textbf{DIVIYA C.}
+
+% =========================================================
+% ABSTRACT
+% =========================================================
+\newpage
+\thispagestyle{plain}
+\phantomsection
+\addcontentsline{toc}{chapter}{Abstract}
+\begin{center}
+    \textbf{\LARGE ABSTRACT} \\[0.8cm]
+\end{center}
+
+\noindent
+Implied Volatility (IV) constitutes the market's forward-looking gauge of aggregate risk and the core unobservable input in options pricing and risk management. In high-frequency and intraday algorithmic derivatives trading, conventional market-making models frequently assume that implied volatility is stationary over short horizons (the \textit{persistence assumption}, $\widehat{\text{IV}}_{t+5} = \text{IV}_t$) or rely on static parametric volatility smiles. In reality, short-term volatility displays non-linear autoregressive clustering, asymmetric momentum responses to underlying spot moves, and market microstructure frictions. 
+
+This thesis presents the design, mathematical formulation, empirical benchmarking, and production deployment of an end-to-end quantitative machine learning framework for **5-minute-ahead implied volatility forecasting ($\Delta \text{IV}_{t+5}$)** and **relative option valuation** on **NIFTY 50 weekly index options** traded on the National Stock Exchange of India (NSE). The framework ingests regularized 5-minute option chain snapshots via the Upstox API v2, enforces rigorous data hygiene (filtering non-positive IV quotes, invalid bid-ask spreads, and near-ATM strike constraints $0.95 \le K/S \le 1.05$), calculates exact fractional Time-to-Expiry (TTE) in hours, and engineers a 39-dimensional feature space capturing multi-horizon volatility velocity, spot momentum, and order book liquidity.
+
+Using a strict chronological train/test split to prevent look-ahead bias, predictive models are empirically evaluated against the random walk persistence benchmark and an Ordinary Least Squares (OLS) linear baseline. A tuned Random Forest regressor engineered with short-term volatility lags achieves a **5.28\% reduction in Mean Absolute Error (MAE)** (0.5214 vs.\ 0.5505) and a **7.72\% reduction in Root Mean Squared Error (RMSE)** (1.2188 vs.\ 1.3207) over the persistence baseline, while OLS completely deteriorates ($R^2 = -0.2410$, $\text{MAE} = 6.1720$) due to extreme non-linear curvature across moneyness space. Gini importance metrics reveal that recent volatility velocity ($\text{IV}_{\text{change}, 5m}$, $\text{IV}_{\text{change}, 10m}$) and bid-ask spreads dominate static contract characteristics. Applying directional conviction thresholding ($|\widehat{\Delta \text{IV}}| \ge 0.10$) increases directional classification accuracy from a noisy baseline of **53.20\% to 63.40\%** (and 64.47\% at $\ge 0.25$), providing execution desks with actionable filter mechanics.
+
+The forecasted volatility is synthesized into a Relative IV Valuation Engine, categorizing option strikes into **Fair/Neutral (77.92\%)**, **Overvalued/Rich (15.46\%)**, and **Undervalued/Cheap (6.61\%)** regimes to drive systematic spread strategies. A multi-factor Black-Scholes scenario engine evaluates non-linear Greek sensitivities across joint spot, volatility, and time shocks. Crucially, out-of-sample stress testing on an unseen weekly expiry day (October 19, 2026, $T < 1.58$ hours) reveals an econometric regime breakdown ($\text{MAE}$ spiking to 17.42), proving that non-expiry volatility dynamics collapse in the hyper-gamma, hyper-theta, vanishing-vega final hours. Finally, the system is operationalized via a live 5-minute automated background prediction daemon and an institutional multi-page Streamlit analytics dashboard.
+
+% =========================================================
+% TABLE OF CONTENTS & LISTS
+% =========================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Table of Contents}
+\setcounter{tocdepth}{1}
+\tableofcontents
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Lists of Figures, Tables \& Abbreviations}
+\begin{center}
+    \textbf{\Large List of Figures}
+\end{center}
+\vspace{-0.2cm}
+\makeatletter
+\@starttoc{lof}
+\makeatother
+
+\vspace{0.3cm}
+\begin{center}
+    \textbf{\Large List of Tables}
+\end{center}
+\vspace{-0.2cm}
+\makeatletter
+\@starttoc{lot}
+\makeatother
+
+\vspace{0.3cm}
+\begin{center}
+    \textbf{\Large List of Abbreviations} \\[0.15cm]
+    \scriptsize
+    \renewcommand{\arraystretch}{0.85}
+    \begin{tabular}{ll@{\qquad}ll}
+        \toprule
+        \textbf{Abbrev.} & \textbf{Full Form} & \textbf{Abbrev.} & \textbf{Full Form} \\
+        \midrule
+        \textbf{API} & Application Programming Interface & \textbf{LTP} & Last Traded Price \\
+        \textbf{ATM} & At-The-Money & \textbf{MAE} & Mean Absolute Error \\
+        \textbf{BSM} & Black-Scholes-Merton & \textbf{MSE} & Mean Squared Error \\
+        \textbf{CE} & European Call Option & \textbf{NSE} & National Stock Exchange of India \\
+        \textbf{GARCH} & Generalized Autoregressive Cond. Het. & \textbf{OI} & Open Interest \\
+        \textbf{GBM} & Geometric Brownian Motion & \textbf{OLS} & Ordinary Least Squares \\
+        \textbf{IST} & Indian Standard Time (UTC+05:30) & \textbf{PCR} & Put-Call Ratio \\
+        \textbf{ITM} & In-The-Money & \textbf{PE} & European Put Option \\
+        \textbf{IV} & Implied Volatility & \textbf{RF} & Random Forest \\
+        \textbf{LOB} & Limit Order Book & \textbf{RMSE} & Root Mean Squared Error \\
+        \textbf{NIFTY} & National Stock Exchange Fifty Index & \textbf{TTE} & Time-to-Expiry \\
+        \textbf{OTM} & Out-Of-The-Money & \textbf{XGBoost} & eXtreme Gradient Boosting \\
+        \bottomrule
+    \end{tabular}
+\end{center}
+
+% =========================================================
+% MAIN TEXT CHAPTERS
+% =========================================================
+\newpage
+\pagenumbering{arabic}
+\pagestyle{fancy}
+
+\include{chapters/introduction}
+\include{chapters/literature_survey}
+\include{chapters/system_design}
+\include{chapters/algorithms}
+\include{chapters/implementation}
+\include{chapters/results}
+\include{chapters/conclusion}
+
+% =========================================================
+% BIBLIOGRAPHY
+% =========================================================
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliographystyle{plain}
+\bibliography{references}
+
+% =========================================================
+% APPENDICES
+% =========================================================
+\newpage
+\appendix
+\renewcommand{\chaptername}{Appendix}
+\bookmarksetup{startatroot}
+\pdfbookmark[0]{Appendices}{appendices}
+\makeatletter
+\renewcommand{\toclevel@chapter}{1}
+\renewcommand{\toclevel@section}{2}
+\renewcommand{\toclevel@subsection}{3}
+\makeatother
+\include{chapters/appendices}
+\bookmarksetup{startatroot}
+
+\end{document}

@@ -70,3 +70,13 @@ NetMirror.apk
 *.log
 *.tmp
 temp/
+
+# LaTeX build artifacts
+Report/*.aux
+Report/*.toc
+Report/*.lof
+Report/*.lot
+Report/*.bbl
+Report/*.blg
+Report/*.out
+Report/chapters/*.aux

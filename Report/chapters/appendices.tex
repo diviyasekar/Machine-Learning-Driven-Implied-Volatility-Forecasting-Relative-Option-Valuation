@@ -1,0 +1,115 @@
+\chapter{Appendices}
+\label{chap:appendices}
+
+\section{Appendix A: Mathematical Derivations of Higher-Order Greeks}
+\label{sec:appendix_higher_order_greeks}
+
+While Chapter \ref{chap:algorithms} established the primary Greeks ($\Delta, \Gamma, \nu, \Theta$), advanced derivatives desks manage higher-order cross-sensitivities to hedge volatility-of-volatility and spot-volatility correlation risks.
+
+\subsection{Derivation of Vanna ($\frac{\partial \Delta}{\partial \sigma} = \frac{\partial \nu}{\partial S}$)}
+\textbf{Vanna} measures the cross-sensitivity of Delta with respect to volatility, identical to the change in Vega per unit shift in spot:
+\begin{equation}
+    \text{Vanna} = \frac{\partial \Delta_C}{\partial \sigma} = \frac{\partial^2 C}{\partial S \partial \sigma} = \frac{\partial [N(d_1)]}{\partial \sigma} = N'(d_1) \frac{\partial d_1}{\partial \sigma}
+\end{equation}
+From Section \ref{subsec:vega_derivation}, $\frac{\partial d_1}{\partial \sigma} = -\frac{\ln(S / K) + r \tau}{\sigma^2 \sqrt{\tau}} + \frac{1}{2} \sqrt{\tau} = -\frac{d_2}{\sigma}$. Substituting this relation:
+\begin{equation}
+    \text{Vanna} = -\frac{N'(d_1) d_2}{\sigma} = -\frac{e^{-d_1^2 / 2} d_2}{\sigma \sqrt{2\pi}}
+    \label{eq:vanna_formula}
+\end{equation}
+For at-the-money options ($d_2 \approx 0$), Vanna is zero. For out-of-the-money calls ($d_2 < 0$), Vanna is positive, indicating that a volatility spike increases call delta toward 0.50.
+
+\subsection{Derivation of Volga / Vomma ($\frac{\partial^2 C}{\partial \sigma^2} = \frac{\partial \nu}{\partial \sigma}$)}
+\textbf{Volga} measures the second-order sensitivity of the option price with respect to volatility (vega convexity):
+\begin{equation}
+    \text{Volga} = \frac{\partial \nu}{\partial \sigma} = \frac{\partial}{\partial \sigma} \left[ S \sqrt{\tau} N'(d_1) \right] = S \sqrt{\tau} \frac{\partial N'(d_1)}{\partial \sigma}
+\end{equation}
+Using the chain rule on the normal density $\frac{\partial N'(d_1)}{\partial \sigma} = -d_1 N'(d_1) \frac{\partial d_1}{\partial \sigma} = \frac{d_1 d_2}{\sigma} N'(d_1)$:
+\begin{equation}
+    \text{Volga} = S \sqrt{\tau} N'(d_1) \frac{d_1 d_2}{\sigma} = \nu \frac{d_1 d_2}{\sigma}
+    \label{eq:volga_formula}
+\end{equation}
+Volga is positive for out-of-the-money contracts ($d_1 d_2 > 0$), quantifying the non-linear tail gains achieved during volatility surges.
+
+\subsection{Derivation of Charm ($\frac{\partial \Delta}{\partial t} = -\frac{\partial \Delta}{\partial \tau}$)}
+\textbf{Charm} quantifies the deterministic rate of delta decay over time:
+\begin{equation}
+    \text{Charm}_C = -\frac{\partial N(d_1)}{\partial \tau} = -N'(d_1) \frac{\partial d_1}{\partial \tau} = -N'(d_1) \left[ \frac{r}{\sigma \sqrt{\tau}} - \frac{d_2}{2\tau} \right]
+    \label{eq:charm_formula}
+\end{equation}
+Charm drives the passive delta slippage that options market makers must rebalance overnight.
+
+\section{Appendix B: Complete 39-Dimensional Feature Schema}
+\label{sec:appendix_feature_schema}
+
+The production machine learning pipeline serializes an exact 39-dimensional feature schema (\texttt{nifty\_iv\_model\_features.joblib}). Table \ref{tab:complete_feature_schema} outlines all 39 features, their lag horizons, and mathematical formulations.
+
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \renewcommand{\arraystretch}{0.88}
+    \caption{Complete 39-Dimensional Feature Schema Specification.}
+    \label{tab:complete_feature_schema}
+    \begin{tabularx}{\textwidth}{rllp{2.2cm}X}
+        \toprule
+        \textbf{\#} & \textbf{Feature Name} & \textbf{Type} & \textbf{Lag Horizon} & \textbf{Quantitative Formulation / Meaning} \\
+        \midrule
+        1--4 & \texttt{strike, spot, moneyness, log\_moneyness} & float64 & $t$ & Strike geometry ($K, S_t, K/S_t, \ln(S_t/K)$). \\
+        5 & \texttt{exact\_tte\_hours} & float64 & $t$ & Fractional hours to expiry: $(T_{\text{expiry}} - t) / 3600$. \\
+        6--9 & \texttt{IV, LTP, Bid, Ask} & float64 & $t$ & Market state variables ($\sigma_t$, Last Traded Price, Best Bid, Best Ask). \\
+        10--11 & \texttt{bid\_ask\_spread, spread\_pct} & float64 & $t$ & Absolute spread ($\text{Ask}-\text{Bid}$) and percentage spread ($\text{Spread}/\text{LTP}$). \\
+        12--14 & \texttt{Volume, OI, pcr} & int/float & $t$ & Trading activity and Put-Call Ratio ($\text{OI}_{\text{PE}} / \text{OI}_{\text{CE}}$). \\
+        15--16 & \texttt{IV\_lag\_5m, IV\_lag\_10m} & float64 & $t-5, t-10$ & Autoregressive volatility lags ($\sigma_{t-5}, \sigma_{t-10}$). \\
+        17--18 & \texttt{IV\_change\_prev\_5m, IV\_change\_prev\_10m} & float64 & $t, t-5, t-10$ & Volatility momentum velocity: $\sigma_t - \sigma_{t-5}$ and $\sigma_t - \sigma_{t-10}$. \\
+        19--22 & \texttt{spot\_lag\_5m, spot\_lag\_10m, spot\_return\_5m, 10m} & float64 & $t-5, t-10$ & Underlying price lags and fractional index returns over 5m and 10m. \\
+        23--25 & \texttt{spread\_lag\_5m, spread\_lag\_10m, spread\_change\_5m} & float64 & $t-5, t-10$ & Order book spread dynamics and spread widening velocity. \\
+        26--28 & \texttt{LTP\_lag\_5m, LTP\_lag\_10m, LTP\_change\_5m} & float64 & $t-5, t-10$ & Historical premium levels and 5-minute price trajectory. \\
+        29--32 & \texttt{Volume\_lag\_5m, Volume\_change\_5m, OI\_lag\_5m, change} & int/float & $t-5$ & Incremental session contract turnover and open interest unwinding. \\
+        33--35 & \texttt{moneyness\_lag\_5m, is\_call, is\_atm} & int/float & $t, t-5$ & Lagged moneyness and binary indicators for call style and ATM status. \\
+        36--38 & \texttt{hour\_of\_day, minute\_of\_hour, time\_fraction} & int/float & $t$ & Intraday cyclical session time coordinates in $[0, 1]$. \\
+        39 & \texttt{iv\_spread\_interaction} & float64 & $t$ & Cross-interaction metric: $\text{IV}_t \times \text{spread\_pct}_t$. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Appendix C: Core Algorithmic Source Code Modules}
+\label{sec:appendix_source_code}
+
+\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=3pt, xleftmargin=1.0em, lineskip=-1.5pt}
+
+\subsection{C.1 Exact Fractional TTE Calculation \& Vectorized Lag Construction}
+\begin{lstlisting}[language=Python, caption={Exact Fractional TTE and Multi-Horizon Lag Construction.}]
+import pandas as pd
+
+def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    # Fractional hours to expiry (standardized to 15:30 IST)
+    df['expiry_dt'] = pd.to_datetime(df['expiry']) + pd.Timedelta(hours=15, minutes=30)
+    df['exact_tte_hours'] = (df['expiry_dt'] - pd.to_datetime(df['timestamp'])).dt.total_seconds() / 3600.0
+    df['exact_tte_hours'] = df['exact_tte_hours'].clip(lower=1e-5)
+    
+    # Sort and construct autoregressive lags by contract key
+    df = df.sort_values(by=['strike', 'option_type', 'timestamp'])
+    grp = df.groupby(['strike', 'option_type'])
+    df['IV_lag_5m'] = grp['IV'].shift(1)
+    df['IV_lag_10m'] = grp['IV'].shift(2)
+    df['IV_change_prev_5m'] = df['IV'] - df['IV_lag_5m']
+    df['IV_change_prev_10m'] = df['IV'] - df['IV_lag_10m']
+    df['bid_ask_spread_lag_5m'] = grp['bid_ask_spread'].shift(1)
+    return df
+\end{lstlisting}
+
+\subsection{C.2 Production Live Inference \& Relative Valuation Screener}
+\begin{lstlisting}[language=Python, caption={Production Live Inference and Valuation Categorization.}]
+import joblib, numpy as np, pandas as pd
+
+def predict_and_screen(df: pd.DataFrame, model, feature_cols, medians) -> pd.DataFrame:
+    X = df.reindex(columns=feature_cols).fillna(medians)
+    df['pred_delta_iv'] = model.predict(X)
+    df['pred_future_iv'] = df['IV'] + df['pred_delta_iv']
+    df['valuation_spread'] = df['IV'] - df['pred_future_iv']
+    
+    # Tagging regimes with delta = 0.50 IV points
+    cond = [df['valuation_spread'] > 0.50, df['valuation_spread'] < -0.50]
+    df['valuation_tag'] = np.select(cond, ['Rich (High IV)', 'Cheap (Low IV)'], default='Fair / Neutral')
+    return df
+\end{lstlisting}

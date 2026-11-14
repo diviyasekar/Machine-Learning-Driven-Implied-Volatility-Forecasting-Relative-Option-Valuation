@@ -1,0 +1,228 @@
+\chapter{System Architecture, Data Engineering \& Analytical Design}
+\label{chap:system_design}
+
+\section{End-to-End System Taxonomy \& Architectural Workflow}
+\label{sec:system_taxonomy}
+
+To forecast high-frequency implied volatility changes and evaluate relative option mispricings in real time, the developed quantitative infrastructure is organized into a modular, five-stage pipeline. The architecture seamlessly connects external market exchange gateways, high-speed tabular sanitation engines, multi-horizon feature constructors, non-linear machine learning ensembles, and interactive decision-support layers.
+
+Figure \ref{fig:system_architecture_tikz} presents the architectural layout and information flow across all system modules.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.9cm and 0.5cm,
+        box/.style={rectangle, draw=black, thick, fill=blue!5, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
+        store/.style={cylinder, draw=black, thick, fill=orange!10, shape border rotate=90, aspect=0.25, minimum height=0.85cm, minimum width=2.2cm, text centered, align=center, text width=2.3cm, font=\scriptsize},
+        proc/.style={rectangle, draw=black, thick, fill=green!8, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
+        model/.style={rectangle, draw=black, thick, fill=purple!8, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
+        eval/.style={rectangle, draw=black, thick, fill=yellow!15, rounded corners, minimum height=0.75cm, text centered, text width=3.2cm, font=\scriptsize},
+        arrow/.style={-{Latex[length=2.2mm]}, thick}
+    ]
+        % Column 1: Ingestion & Storage
+        \node (api) [box] {\textbf{Upstox API v2}\\(NSE NIFTY 50 Chain)};
+        \node (sync) [box, below=0.7cm of api] {\textbf{5-Min Wall-Clock}\\Synchronizer (300s)};
+        \node (raw) [store, below=0.7cm of sync] {\textbf{Raw Snapshot Store}\\\textit{data/raw/*.csv}};
+
+        % Column 2: Sanitation & Feature Engineering
+        \node (clean) [proc, right=1.0cm of api] {\textbf{Data Sanitation}\\Zero IV \& Spread QC};
+        \node (geom) [proc, below=0.7cm of clean] {\textbf{Moneyness Filtering}\\$0.95 \le K/S \le 1.05$};
+        \node (feat) [proc, below=0.7cm of geom] {\textbf{Feature Engineering}\\Exact TTE \& Lags};
+
+        % Column 3: Split & Modeling
+        \node (split) [eval, right=1.0cm of clean] {\textbf{Chronological Split}\\Strict Out-of-Sample};
+        \node (rf) [model, below=0.7cm of split] {\textbf{Random Forest}\\Ensemble + Lags};
+        \node (base) [model, below=0.7cm of rf] {\textbf{Persistence Baseline}\\$\widehat{\Delta \text{IV}}_{t+5} = 0$};
+
+        % Column 4: Valuation & Deployment
+        \node (conv) [eval, right=1.0cm of split] {\textbf{Conviction Gating}\\$|\widehat{\Delta \text{IV}}| \ge \theta$};
+        \node (relval) [eval, below=0.7cm of conv] {\textbf{Relative Valuation}\\Fair / Rich / Cheap};
+        \node (deploy) [box, below=0.7cm of relval] {\textbf{Live Daemon \& UI}\\Streamlit Dashboard};
+
+        % Connecting Arrows
+        \draw [arrow] (api) -- (sync);
+        \draw [arrow] (sync) -- (raw);
+        \draw [arrow] (raw.east) -- ++(0.3,0) |- (clean.west);
+        \draw [arrow] (clean) -- (geom);
+        \draw [arrow] (geom) -- (feat);
+        \draw [arrow] (feat.east) -- ++(0.3,0) |- (split.west);
+        \draw [arrow] (split) -- (rf);
+        \draw [arrow] (split) -- (base);
+        \draw [arrow] (rf) -- (conv);
+        \draw [arrow] (conv) -- (relval);
+        \draw [arrow] (relval) -- (deploy);
+    \end{tikzpicture}
+    \caption{End-to-End System Pipeline and Quantitative Data Flow Architecture.}
+    \label{fig:system_architecture_tikz}
+\end{figure}
+
+The pipeline executes through sequential modules:
+\begin{enumerate}
+    \item \textbf{High-Frequency Market Ingestion:} Synchronizes with the National Stock Exchange (NSE) trading calendar, querying the Upstox API v2 at 300-second intervals to extract full tabular option-chain snapshots.
+    \item \textbf{Quantitative Hygiene \& Geometry Bounds:} Enforces no-arbitrage bounds, cleans invalid market quotes, purges zero-IV records, and restricts strikes to economically meaningful near-ATM bounds.
+    \item \textbf{Micro-Temporal Feature Engineering:} Derives exact continuous Time-to-Expiry in fractional hours, establishes autoregressive lags across multiple lookback windows, and generates volatility momentum signals.
+    \item \textbf{Ensemble Modeling \& Benchmarking:} Evaluates non-linear regressors under strict chronological partitioning against the persistence benchmark.
+    \item \textbf{Institutional Valuation, Stress Testing \& Live Deployment:} Categorizes option contracts into relative valuation regimes, calculates multi-factor Black-Scholes scenario sensitivities, and powers real-time algorithmic execution interfaces.
+\end{enumerate}
+
+\section{High-Frequency Ingestion Infrastructure: Upstox API v2 \& Wall-Clock Alignment}
+\label{sec:ingestion_infrastructure}
+
+Intraday algorithmic trading requires synchronized, regularized time-series observations. If data collection is initiated using arbitrary execution delays (such as generic \texttt{sleep(300)} statements), cumulative network latency and JSON parsing overhead cause progressive sampling drift, contaminating econometric lag structures.
+
+To guarantee exact temporal alignment, the ingestion engine implements a **Wall-Clock Boundary Synchronization Algorithm**. Let $t_{\text{now}}$ represent the current Epoch timestamp in seconds. The exact waiting duration $\Delta t_{\text{wait}}$ until the subsequent 5-minute wall-clock boundary is calculated as:
+\begin{equation}
+    \Delta t_{\text{wait}} = 300 - \left(t_{\text{now}} \pmod{300}\right)
+    \label{eq:wall_clock_sync}
+\end{equation}
+The daemon process suspends thread execution for exactly $\Delta t_{\text{wait}}$ seconds, guaranteeing that every market snapshot is triggered within milliseconds of `XX:00`, `XX:05`, `XX:10`, \dots, `XX:55`.
+
+Data harvesting is actively constrained to the official Indian cash and derivatives market session:
+\begin{equation}
+    \mathcal{T}_{\text{market}} = \left\{ t \;\middle|\; \text{DayOfWeek}(t) \in [1, 5] \;\land\; 09:15:00 \le \text{Time}_{\text{IST}}(t) \le 15:30:00 \right\}
+\end{equation}
+When the system clock falls outside $\mathcal{T}_{\text{market}}$, API polling transitions into a low-frequency standby state to preserve institutional quota limits.
+
+During market hours, authenticated requests are dispatched to the Upstox API v2 option-chain endpoint:
+\begin{quote}
+    \texttt{GET /v2/option/chain?instrument\_key=NSE\_INDEX|Nifty 50\&expiry\_date=YYYY-MM-DD}
+\end{quote}
+The returned JSON payload encapsulates the complete market depth and pricing parameters for all active Call (CE) and Put (PE) strikes. The normalizer extracts the nested structures and serializes them into standardized tabular CSV snapshots. Table \ref{tab:raw_snapshot_schema} details the core raw snapshot schema.
+
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \renewcommand{\arraystretch}{0.90}
+    \caption{Raw Ingested Option Chain Snapshot Schema.}
+    \label{tab:raw_snapshot_schema}
+    \begin{tabularx}{\textwidth}{lllX}
+        \toprule
+        \textbf{Field Name} & \textbf{Data Type} & \textbf{Unit / Format} & \textbf{Quantitative Description} \\
+        \midrule
+        \texttt{timestamp, expiry} & datetime/date & ISO 8601 / YYYY-MM-DD & Snapshot acquisition timestamp (IST) and weekly expiry date. \\
+        \texttt{spot, strike} & float64 & Index Points & NIFTY 50 cash underlying index level ($S_t$) and exercise strike ($K$). \\
+        \texttt{option\_type} & string & CE / PE & Option contract style (\texttt{CE} = European Call, \texttt{PE} = European Put). \\
+        \texttt{LTP, Bid, Ask} & float64 & INR (\rupee) & Last Traded Price, highest limit buy quote, and lowest limit sell quote. \\
+        \texttt{Volume, OI} & int/float & Contracts & Cumulative intraday traded contracts and total open interest. \\
+        \texttt{IV, pcr} & float64 & \% / Ratio & Upstox/NSE computed implied volatility and strike-specific Put-Call Ratio. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Data Sanitation, Filtering \& Quantitative Hygiene}
+\label{sec:data_sanitation}
+
+Raw financial exchange feeds contain reporting anomalies, phantom quotes, and stale prices arising from illiquid strikes. Feeding uncurated market feeds into non-linear machine learning models leads to severe variance distortion and misleading forecasting signals. The data hygiene pipeline applies three sequential quantitative filters:
+
+\subsection{Filter 1: Purging Non-Positive Implied Volatility Quotes}
+In exchange quote feeds, an implied volatility of zero ($\text{IV} \le 0$) indicates that the numerical BSM inversion algorithm failed to converge, either because the contract did not trade, the bid price fell below intrinsic value ($C < \max(0, S - K)$), or the exchange reported null values. All contracts satisfying:
+\begin{equation}
+    \mathcal{F}_{\text{IV}} = \left\{ i \;\middle|\; \text{IV}_i \le 0 \lor \text{isNaN}(\text{IV}_i) \right\}
+\end{equation}
+are permanently excised from the dataset.
+
+\subsection{Filter 2: Bid-Ask Spread Sanity Verification}
+In theoretical finance, mid-prices are assumed to reflect fair economic value. In actual limit order books, wide or crossed spreads signal severe liquidity vacuums. The hygiene engine enforces valid order book conditions:
+\begin{equation}
+    \mathcal{F}_{\text{Spread}} = \left\{ i \;\middle|\; \text{Bid}_i > 0 \;\land\; \text{Ask}_i \ge \text{Bid}_i \;\land\; (\text{Ask}_i - \text{Bid}_i) \le 50.0 \right\}
+\end{equation}
+Contracts exhibiting zero bids, crossed books ($\text{Ask} < \text{Bid}$), or extreme bid-ask spreads exceeding 50 index points are discarded as non-executable quotes.
+
+\subsection{Filter 3: Near-ATM Strike Geometry Bounds}
+Deep out-of-the-money (OTM) and deep in-the-money (ITM) options trade at negligible liquidity, wide percentage spreads, and exhibit minimal vega sensitivity. Furthermore, quoting noise in deep-wing contracts generates extreme percentage volatility swings that do not reflect true institutional price discovery.
+
+To focus the forecasting framework on the liquid core of the options chain where active market making and hedging occur, strike prices are constrained to a strict near-the-money band around the underlying spot level:
+\begin{equation}
+    0.95 \le \frac{K}{S_t} \le 1.05
+    \label{eq:near_atm_bound}
+\end{equation}
+This bound encompasses contracts within $\pm 5\%$ of the prevailing NIFTY 50 spot price (e.g., between 22,000 and 24,300 for a spot level of 23,125), capturing approximately 92\% of total open interest and 95\% of daily options turnover while eliminating boundary distortion.
+
+\section{Exact Fractional Time-to-Expiry (TTE) Engineering}
+\label{sec:exact_tte}
+
+A pervasive flaw in standard option pricing implementations is the discretization of maturity into integer days ($\tau = \text{Days} / 365$). For long-dated monthly or annual options, day-rounding introduces negligible relative error. However, for weekly index options maturing within 1 to 4 trading days, integer rounding produces disastrous step-function discontinuities.
+
+Consider an option observed on Thursday morning at 09:30 IST with weekly settlement occurring at 15:30 IST on the same day. An integer day calculation assigns $\text{Days} = 0$, causing division-by-zero errors in $d_1$ and $d_2$, or sets $\text{Days} = 1$, overestimating true remaining life by a factor of four. Over a 5-minute intraday interval, true time-to-expiry decays continuously.
+
+To capture high-frequency theta decay, the quantitative pipeline engineers an **Exact Fractional Time-to-Expiry (TTE)** metric. Let $T_{\text{expiry}}$ be the precise contract expiration timestamp (standardized to 15:30:00 IST on the weekly settlement date), and let $t_{\text{current}}$ be the high-precision snapshot timestamp. The remaining duration in exact fractional hours is computed as:
+\begin{equation}
+    \text{TTE}_{\text{hours}} = \frac{T_{\text{expiry}} - t_{\text{current}}}{3600 \text{ seconds}}
+    \label{eq:tte_hours}
+\end{equation}
+
+When expressed in annual trading units $\tau$ for closed-form Black-Scholes evaluation, the fractional duration is converted using standard calendar convention:
+\begin{equation}
+    \tau = \frac{\text{TTE}_{\text{hours}}}{24 \times 365} = \frac{\text{TTE}_{\text{hours}}}{8760}
+    \label{eq:tau_annual}
+\end{equation}
+This continuous formulation ensures that the option pricing engine accurately measures the rapid acceleration of theta ($\Theta$) and gamma ($\Gamma$) across 5-minute sampling intervals.
+
+\section{Autoregressive Feature Construction \& Temporal Alignment}
+\label{sec:autoregressive_features}
+
+To equip the predictive models with temporal memory without violating causality, the feature engineering pipeline constructs multi-horizon autoregressive lags and momentum indicators. Each contract is uniquely indexed by the composite key $(K, \text{option\_type})$. For each discrete time step $t$, the state vector incorporates historical information from prior intervals $t-5$ and $t-10$ minutes.
+
+The engineered feature space spans five functional categories:
+\begin{enumerate}
+    \item \textbf{Strike Geometry \& Relative Moneyness:}
+    \begin{align}
+        \text{moneyness} &= \frac{K}{S_t} \\
+        \text{log\_moneyness} &= \ln\left(\frac{S_t}{K}\right)
+    \end{align}
+    \item \textbf{Continuous Temporal Variables:}
+    \begin{equation}
+        \text{exact\_tte\_hours} = \text{TTE}_{\text{hours}}(t)
+    \end{equation}
+    \item \textbf{Autoregressive Volatility Memory:}
+    \begin{equation}
+        \text{IV}_t = \sigma_{\text{market}}(t), \quad \text{IV}_{\text{lag}\_5m} = \sigma_{\text{market}}(t-5), \quad \text{IV}_{\text{lag}\_10m} = \sigma_{\text{market}}(t-10)
+    \end{equation}
+    \item \textbf{Volatility Momentum \& Velocity:}
+    \begin{align}
+        \text{IV\_change\_prev\_5m} &= \text{IV}_t - \text{IV}_{\text{lag}\_5m} \\
+        \text{IV\_change\_prev\_10m} &= \text{IV}_t - \text{IV}_{\text{lag}\_10m}
+    \end{align}
+    \item \textbf{Market Microstructure \& Order Book Liquidity:}
+    \begin{align}
+        \text{bid\_ask\_spread} &= \text{Ask}_t - \text{Bid}_t \\
+        \text{bid\_ask\_spread\_lag\_5m} &= \text{Ask}_{t-5} - \text{Bid}_{t-5} \\
+        \text{spread\_ratio} &= \frac{\text{Ask}_t - \text{Bid}_t}{\text{LTP}_t} \\
+        \text{spot\_lag\_5m} &= S_{t-5}, \quad \Delta \text{spot}_{5m} = S_t - S_{t-5}
+    \end{align}
+\end{enumerate}
+
+Table \ref{tab:master_feature_catalog} summarizes the primary mathematical feature catalog deployed in the predictive engine.
+
+\begin{table}[H]
+    \centering
+    \scriptsize
+    \renewcommand{\arraystretch}{0.90}
+    \caption{Engineered Feature Catalog for 5-Minute Implied Volatility Forecasting.}
+    \label{tab:master_feature_catalog}
+    \begin{tabularx}{\textwidth}{llp{3.8cm}X}
+        \toprule
+        \textbf{Feature Symbol} & \textbf{Category} & \textbf{Mathematical Definition} & \textbf{Financial Rationale} \\
+        \midrule
+        \texttt{moneyness, log\_m} & Geometry & $K / S_t$, $\ln(S_t / K)$ & Normalized strike distance and log-moneyness. \\
+        \texttt{exact\_tte\_hours} & Temporal & $(T_{\text{expiry}} - t) / 3600$ & Exact continuous time decay in fractional hours. \\
+        \texttt{IV} & State & $\sigma_t$ & Current baseline market implied volatility. \\
+        \texttt{IV\_lag\_5m, 10m} & Autoregressive & $\sigma_{t-5}$, $\sigma_{t-10}$ & Short- and medium-term volatility states. \\
+        \texttt{IV\_change\_prev\_5m, 10m} & Momentum & $\sigma_t - \sigma_{t-5}$, $\sigma_t - \sigma_{t-10}$ & Instantaneous and cumulative volatility velocity. \\
+        \texttt{spread, spread\_lag} & Microstructure & $\text{Ask}_t - \text{Bid}_t$, $\text{Spread}_{t-5}$ & Order-book liquidity and dealer inventory cost. \\
+        \texttt{spot, spot\_lag\_5m} & Underlying & $S_t$, $S_{t-5}$ & Underlying NIFTY 50 index levels and directional trend. \\
+        \texttt{pcr} & Sentiment & $\text{OI}_{\text{PE}} / \text{OI}_{\text{CE}}$ & Cross-strike institutional directional sentiment. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Chronological Data Partitioning \& Non-Leakage Enforcement}
+\label{sec:chronological_partitioning}
+
+A critical methodological pitfall in machine learning applications to quantitative finance is the improper use of standard randomized cross-validation (such as randomized $K$-fold splits). When financial observations are shuffled at random, future data points ($t+5$) are incorporated into the training set while past points ($t$) appear in the test set. Because volatility time series exhibit severe autoregressive correlation, randomized partitioning leads to rampant temporal leakage, yielding artificially inflated $R^2$ scores that instantly collapse upon live production deployment \cite{lopez2018advances}.
+
+To ensure absolute methodological integrity, this research enforces a **Strict Chronological Train / Test Partitioning**. All snapshots are arranged strictly in chronological order:
+\begin{equation}
+    \mathcal{T}_{\text{train}} = \{t \mid t \le t_{\text{split}}\}, \quad \mathcal{T}_{\text{test}} = \{t \mid t > t_{\text{split}}\}
+\end{equation}
+where $t_{\text{split}}$ corresponds to the midday timestamp of October 16, 2026. Models are fitted exclusively on $\mathcal{T}_{\text{train}}$ and evaluated strictly out-of-sample on unseen subsequent observations $\mathcal{T}_{\text{test}}$. All data transformations, scaling, and feature imputations utilize parameters derived solely from $\mathcal{T}_{\text{train}}$, ensuring zero look-ahead bias.

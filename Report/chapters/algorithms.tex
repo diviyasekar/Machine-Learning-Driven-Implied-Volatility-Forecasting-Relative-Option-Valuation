@@ -1,0 +1,190 @@
+\chapter{Mathematical Formulations, Greeks Derivations \& Algorithmic Engines}
+\label{chap:algorithms}
+
+\section{Mathematical Derivations of the Black-Scholes-Merton Greeks}
+\label{sec:greeks_derivations}
+
+The Black-Scholes-Merton (BSM) Greeks represent the partial derivatives of option prices with respect to fundamental underlying state parameters: spot price ($S$), volatility ($\sigma$), time-to-expiry ($\tau = T - t$), and risk-free interest rate ($r$). They form the analytical foundation for dynamic hedging and scenario stress testing.
+
+Let the closed-form BSM formulas for European call ($C$) and put ($P$) options on a non-dividend asset be:
+\begin{equation}
+    C = S N(d_1) - K e^{-r\tau} N(d_2), \quad P = K e^{-r\tau} N(-d_2) - S N(-d_1)
+    \label{eq:bsm_prices_alg}
+\end{equation}
+where $N(x) = \frac{1}{\sqrt{2\pi}} \int_{-\infty}^{x} e^{-u^2/2} du$, $N'(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2/2}$, and:
+\begin{equation}
+    d_1 = \frac{\ln(S / K) + \left(r + \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}, \quad d_2 = d_1 - \sigma \sqrt{\tau} = \frac{\ln(S / K) + \left(r - \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}
+    \label{eq:d1_d2_alg}
+\end{equation}
+
+\subsection{Foundational Lemma: The Identity $S N'(d_1) = K e^{-r\tau} N'(d_2)$}
+\label{subsec:foundational_lemma}
+
+\noindent
+\textbf{Lemma 1.} \textit{For all $S, K, \sigma > 0$ and $\tau > 0$, the following identity holds identically:}
+\begin{equation}
+    S N'(d_1) = K e^{-r\tau} N'(d_2)
+    \label{eq:fundamental_identity}
+\end{equation}
+\textbf{Proof.} Evaluating the ratio using $N'(x) = \frac{1}{\sqrt{2\pi}} e^{-x^2/2}$:
+\begin{equation}
+    \frac{S N'(d_1)}{K e^{-r\tau} N'(d_2)} = \frac{S}{K e^{-r\tau}} \exp\left( -\frac{1}{2} (d_1^2 - d_2^2) \right)
+\end{equation}
+Expanding the exponent using $d_2 = d_1 - \sigma \sqrt{\tau}$:
+\begin{equation}
+    d_1^2 - d_2^2 = d_1^2 - (d_1 - \sigma\sqrt{\tau})^2 = 2 d_1 \sigma \sqrt{\tau} - \sigma^2 \tau = 2\left[\ln(S/K) + (r + \tfrac{1}{2}\sigma^2)\tau\right] - \sigma^2 \tau = 2\ln(S/K) + 2r\tau
+\end{equation}
+Substituting this back into the exponential term:
+\begin{equation}
+    \exp\left( -\tfrac{1}{2}[2\ln(S/K) + 2r\tau] \right) = \exp(-\ln(S/K) - r\tau) = \frac{K}{S} e^{-r\tau}
+\end{equation}
+Thus, $\frac{S N'(d_1)}{K e^{-r\tau} N'(d_2)} = \frac{S}{K e^{-r\tau}} \cdot \left(\frac{K}{S} e^{-r\tau}\right) = 1 \implies S N'(d_1) = K e^{-r\tau} N'(d_2) \quad \blacksquare$.
+
+\subsection{Derivation of Delta ($\Delta$)}
+\label{subsec:delta_derivation}
+
+\textbf{Delta} ($\Delta = \partial V / \partial S$) measures instantaneous price sensitivity to underlying spot moves. Differentiating Call price $C$ with respect to $S$:
+\begin{equation}
+    \frac{\partial C}{\partial S} = N(d_1) + S N'(d_1) \frac{\partial d_1}{\partial S} - K e^{-r\tau} N'(d_2) \frac{\partial d_2}{\partial S}
+\end{equation}
+Since $\frac{\partial d_1}{\partial S} = \frac{\partial d_2}{\partial S} = \frac{1}{S \sigma \sqrt{\tau}}$, factoring gives:
+\begin{equation}
+    \frac{\partial C}{\partial S} = N(d_1) + \left[ S N'(d_1) - K e^{-r\tau} N'(d_2) \right] \frac{1}{S \sigma \sqrt{\tau}}
+\end{equation}
+By Lemma 1, the bracketed term is zero identically. Thus:
+\begin{equation}
+    \Delta_C = \frac{\partial C}{\partial S} = N(d_1) \in (0, 1), \quad \Delta_P = \frac{\partial P}{\partial S} = N(d_1) - 1 = -N(-d_1) \in (-1, 0)
+    \label{eq:delta_formulas}
+\end{equation}
+
+\subsection{Derivation of Gamma ($\Gamma$)}
+\label{subsec:gamma_derivation}
+
+\textbf{Gamma} ($\Gamma = \partial^2 V / \partial S^2 = \partial \Delta / \partial S$) measures the curvature of option value with respect to spot. Differentiating $\Delta_C = N(d_1)$:
+\begin{equation}
+    \Gamma_C = \frac{\partial N(d_1)}{\partial S} = N'(d_1) \frac{\partial d_1}{\partial S} = \frac{N'(d_1)}{S \sigma \sqrt{\tau}} = \frac{e^{-d_1^2/2}}{S \sigma \sqrt{2\pi \tau}}
+    \label{eq:gamma_call}
+\end{equation}
+Differentiating $\Delta_P = N(d_1) - 1$ yields the identical result, proving $\Gamma_C = \Gamma_P > 0$.
+\noindent
+\textbf{Asymptotic Property near Expiry ($\tau \to 0$):} For ATM options ($S \approx K \implies d_1 \approx 0$), $\lim_{\tau \to 0} \Gamma_{\text{ATM}} = \lim_{\tau \to 0} \frac{1}{S \sigma \sqrt{2\pi \tau}} = +\infty$. This mathematical asymptote produces hyper-gamma instability during the final hours of weekly expiry.
+
+\subsection{Derivation of Vega ($\nu$)}
+\label{subsec:vega_derivation}
+
+\textbf{Vega} ($\nu = \partial V / \partial \sigma$) measures option price sensitivity to implied volatility. Differentiating Call price $C$ with respect to $\sigma$:
+\begin{equation}
+    \frac{\partial C}{\partial \sigma} = S N'(d_1) \frac{\partial d_1}{\partial \sigma} - K e^{-r\tau} N'(d_2) \frac{\partial d_2}{\partial \sigma}
+\end{equation}
+Using $\frac{\partial d_1}{\partial \sigma} = -\frac{\ln(S/K) + r\tau}{\sigma^2 \sqrt{\tau}} + \frac{1}{2}\sqrt{\tau}$ and $\frac{\partial d_2}{\partial \sigma} = \frac{\partial d_1}{\partial \sigma} - \sqrt{\tau}$, and applying Lemma 1:
+\begin{equation}
+    \nu = \frac{\partial C}{\partial \sigma} = \frac{\partial P}{\partial \sigma} = S \sqrt{\tau} N'(d_1) = \frac{S \sqrt{\tau}}{\sqrt{2\pi}} e^{-d_1^2/2}
+    \label{eq:vega_call}
+\end{equation}
+\noindent
+\textbf{Asymptotic Property near Expiry ($\tau \to 0$):} Since Vega is proportional to $\sqrt{\tau}$, $\lim_{\tau \to 0} \nu = 0$ for all strikes. This vanishing vega property causes numerical root-finding algorithms to diverge near expiry.
+
+\subsection{Derivation of Theta ($\Theta$)}
+\label{subsec:theta_derivation}
+
+\textbf{Theta} ($\Theta = \partial V / \partial t = -\partial V / \partial \tau$) measures the rate of extrinsic value decay as calendar time advances. Differentiating $C$ with respect to $\tau$:
+\begin{equation}
+    \frac{\partial C}{\partial \tau} = S N'(d_1) \frac{\partial d_1}{\partial \tau} + r K e^{-r\tau} N(d_2) - K e^{-r\tau} N'(d_2) \frac{\partial d_2}{\partial \tau}
+\end{equation}
+Using $\frac{\partial d_2}{\partial \tau} = \frac{\partial d_1}{\partial \tau} - \frac{\sigma}{2\sqrt{\tau}}$ and Lemma 1 ($S N'(d_1) = K e^{-r\tau} N'(d_2)$):
+\begin{equation}
+    \frac{\partial C}{\partial \tau} = \frac{S \sigma N'(d_1)}{2 \sqrt{\tau}} + r K e^{-r\tau} N(d_2)
+\end{equation}
+Since $\Theta = -\partial C / \partial \tau$, we obtain:
+\begin{align}
+    \Theta_C &= -\frac{S \sigma N'(d_1)}{2 \sqrt{\tau}} - r K e^{-r\tau} N(d_2) \label{eq:theta_call} \\
+    \Theta_P &= -\frac{S \sigma N'(d_1)}{2 \sqrt{\tau}} + r K e^{-r\tau} N(-d_2) \label{eq:theta_put}
+\end{align}
+\noindent
+\textbf{Asymptotic Property near Expiry ($\tau \to 0$):} The lead term has $\sqrt{\tau}$ in the denominator, causing $\lim_{\tau \to 0} \Theta_{\text{ATM}} = -\infty$. This explains the hyper-theta premium collapse observed on weekly expiry afternoon.
+
+\subsection{Master PDE Interrelationship}
+\label{subsec:greek_master_pde}
+The fundamental Greeks are unified through the Black-Scholes-Merton Partial Differential Equation:
+\begin{equation}
+    \Theta + \frac{1}{2} \sigma^2 S^2 \Gamma + r S \Delta - r V = 0
+    \label{eq:master_greek_pde}
+\end{equation}
+proving that theta decay ($\Theta$) acts as the exact physical funding cost for delta-gamma rebalancing.
+
+\section{Numerical Inversion of Implied Volatility: Newton-Raphson}
+\label{sec:iv_inversion_algorithm}
+
+Because $\sigma$ enters non-linearly into $N(d_1)$ and $N(d_2)$, the BSM formula cannot be algebraically inverted. Implied volatility is extracted numerically by solving:
+\begin{equation}
+    f(\sigma) \equiv C_{\text{BSM}}(S, K, \tau, r, \sigma) - C_{\text{market}} = 0
+\end{equation}
+Using Newton-Raphson iteration with derivative $f'(\sigma) = \nu(S, K, \tau, r, \sigma)$:
+\begin{equation}
+    \sigma_{n+1} = \sigma_n - \frac{C_{\text{BSM}}(S, K, \tau, r, \sigma_n) - C_{\text{market}}}{\nu(S, K, \tau, r, \sigma_n)}
+    \label{eq:newton_raphson_iv}
+\end{equation}
+
+Algorithm \ref{alg:newton_raphson_iv} presents the numerical inversion procedure.
+
+\begin{algorithm}[H]
+\caption{Newton-Raphson Implied Volatility Numerical Inversion}
+\label{alg:newton_raphson_iv}
+\begin{algorithmic}[1]
+\Require Spot $S$, Strike $K$, Expiry $\tau$, Rate $r$, Price $C_{\text{market}}$, Tol $\epsilon = 10^{-6}$, Max Iter $N_{\max} = 100$
+\Ensure Implied Volatility $\sigma_{\text{implied}}$
+\State \textbf{if} $C_{\text{market}} < \max(0, S - K e^{-r\tau})$ \textbf{then return} $\text{NaN}$ \Comment{Intrinsic arbitrage violation}
+\State Initialize: $\sigma_0 \gets \sqrt{2\pi / \tau} \cdot (C_{\text{market}} / S)$
+\For{$n = 0$ \textbf{to} $N_{\max}$}
+    \State Compute $d_1, d_2$ via Eq. \eqref{eq:d1_d2_alg}; $C_{\text{model}} \gets S N(d_1) - K e^{-r\tau} N(d_2)$
+    \State Compute error $\Delta C \gets C_{\text{model}} - C_{\text{market}}$; \textbf{if} $|\Delta C| < \epsilon$ \textbf{then return} $\sigma_n$
+    \State Compute Vega $\nu \gets S \sqrt{\tau} N'(d_1)$; \textbf{if} $\nu < 10^{-7}$ \textbf{then} fall back to Brent bisection
+    \State $\sigma_{n+1} \gets \sigma_n - \Delta C / \nu$
+\EndFor
+\State \Return $\sigma_{N_{\max}}$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Predictive Model Formulations}
+\label{sec:predictive_models_math}
+
+The target is the 5-minute volatility change $\Delta \text{IV}_{t+5} = \text{IV}_{t+5} - \text{IV}_t$. Four models are formulated:
+\begin{enumerate}
+    \item \textbf{Persistence Benchmark:} Assumes zero change: $\widehat{\Delta \text{IV}}_{t+5} = 0 \iff \widehat{\text{IV}}_{t+5} = \text{IV}_t$.
+    \item \textbf{Ordinary Least Squares (OLS):} $\mathbf{y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\epsilon}$, with $\widehat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{y}$. Fails to capture parabolic smile curvature across moneyness space ($K/S$).
+    \item \textbf{Random Forest Regressor:} Constructs $B$ decorrelated bagged trees: $\widehat{y}_{\text{RF}}(\mathbf{x}) = \frac{1}{B} \sum_{b=1}^B T_b(\mathbf{x})$. Minimizes MSE node impurity with random feature subsampling ($m_{\text{try}} = \sqrt{p}$).
+    \item \textbf{XGBoost Regressor:} Sequential gradient boosting minimizing regularized loss $\mathcal{L}^{(t)} = \sum_{i=1}^N [g_i f_t(\mathbf{x}_i) + \frac{1}{2}h_i f_t^2(\mathbf{x}_i)] + \gamma T_{\text{leaves}} + \frac{1}{2}\lambda \sum w_j^2$, with optimal leaf weight $w_j^* = -\sum g_i / (\sum h_i + \lambda)$.
+\end{enumerate}
+
+\section{Conviction Thresholding, Valuation Spread \& Stress Framework}
+\label{sec:downstream_formulations}
+
+\subsection{Directional Conviction Gating}
+\label{sec:conviction_thresholding_math}
+To filter low-conviction noise churn, signals are filtered by magnitude threshold $\theta$:
+\begin{equation}
+    \mathcal{S}_\theta = \left\{ i \;\middle|\; \left|\widehat{\Delta \text{IV}}_{t+5, i}\right| \ge \theta \right\}, \quad \text{HitRate}(\theta) = \frac{1}{|\mathcal{S}_\theta|} \sum_{i \in \mathcal{S}_\theta} \mathbb{I}\left( \text{sgn}(\widehat{\Delta \text{IV}}_i) == \text{sgn}(\Delta \text{IV}_i) \right)
+\end{equation}
+
+\subsection{Relative IV Valuation Engine}
+\label{sec:relative_iv_valuation_math}
+The **Valuation Spread** compares market IV against model forecast:
+\begin{equation}
+    \text{Spread}_i = \text{IV}_{t, i} - \widehat{\text{IV}}_{t+5, i} = -\widehat{\Delta \text{IV}}_{t+5, i}
+\end{equation}
+Contracts are partitioned with boundary $\delta_{\text{val}} = 0.50$ points:
+\begin{equation}
+    \text{Regime Tag}_i = \begin{cases}
+        \textbf{High IV (Rich / Overvalued)}, & \text{Spread}_i > +0.50 \implies \text{Credit Spreads / Short Vega} \\
+        \textbf{Fair / Neutral IV}, & |\text{Spread}_i| \le 0.50 \implies \text{Delta-Neutral Market Making} \\
+        \textbf{Low IV (Cheap / Undervalued)}, & \text{Spread}_i < -0.50 \implies \text{Debit Spreads / Long Vega}
+    \end{cases}
+\end{equation}
+
+\subsection{Multi-Factor Scenario Stress Matrix}
+\label{sec:scenario_simulation_math}
+Perturbing state parameters over grid $\mathcal{S} \times \Sigma \times \mathcal{T}$ ($S \pm 2\%, \sigma \pm 20\%, \Delta\tau \in [0, 24\text{h}]$):
+\begin{equation}
+    \widetilde{V}_{k, m, j} = V_{\text{BSM}}(S_k, K, \tau_j, r, \sigma_m), \quad \Delta P\&L\% = \frac{\widetilde{V}_{k, m, j} - V_0}{V_0} \times 100\%
+\end{equation}
+evaluating joint non-linear Delta, Gamma, Vega, and Theta interactions under extreme shocks.
