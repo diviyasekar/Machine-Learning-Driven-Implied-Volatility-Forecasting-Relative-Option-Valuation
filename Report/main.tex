@@ -3,7 +3,7 @@
 % =========================================================
 % PACKAGES
 % =========================================================
-\usepackage[margin=0.75in,top=0.75in,bottom=0.75in]{geometry}
+\usepackage[margin=0.75in,top=0.70in,bottom=0.75in,footskip=18pt]{geometry}
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -21,8 +21,27 @@
 \usepackage{setspace}
 \usepackage{color,xcolor}
 \usepackage{pdfpages}
+\usepackage{eso-pic}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, arrows.meta, positioning, calc, fit, backgrounds, shadows}
+
+% =========================================================
+% PAGE BORDER (EVERY PAGE)
+% =========================================================
+\AddToShipoutPictureBG{%
+    \begin{tikzpicture}[remember picture, overlay]
+        % Outer primary border
+        \draw[line width=1.0pt, color=black] 
+            ($(current page.north west) + (0.28in, -0.28in)$) 
+            rectangle 
+            ($(current page.south east) + (-0.28in, 0.28in)$);
+        % Inner subtle accent border
+        \draw[line width=0.4pt, color=black] 
+            ($(current page.north west) + (0.315in, -0.315in)$) 
+            rectangle 
+            ($(current page.south east) + (-0.315in, 0.315in)$);
+    \end{tikzpicture}%
+}
 \usepackage[pdftex,bookmarksnumbered=true,colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
 \usepackage{bookmark}
 
@@ -369,7 +388,7 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 
 \newpage
 \phantomsection
-\addcontentsline{toc}{chapter}{Lists of Figures, Tables \& Abbreviations}
+\addcontentsline{toc}{chapter}{Lists of Figures \& Tables}
 \begin{center}
     \textbf{\Large List of Figures}
 \end{center}
@@ -378,7 +397,7 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 \@starttoc{lof}
 \makeatother
 
-\vspace{0.3cm}
+\vspace{0.4cm}
 \begin{center}
     \textbf{\Large List of Tables}
 \end{center}
@@ -387,11 +406,13 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 \@starttoc{lot}
 \makeatother
 
-\vspace{0.3cm}
+\newpage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Abbreviations}
 \begin{center}
-    \textbf{\Large List of Abbreviations} \\[0.15cm]
-    \scriptsize
-    \renewcommand{\arraystretch}{0.85}
+    \textbf{\Large List of Abbreviations} \\[0.3cm]
+    \small
+    \renewcommand{\arraystretch}{0.95}
     \begin{tabular}{ll@{\qquad}ll}
         \toprule
         \textbf{Abbrev.} & \textbf{Full Form} & \textbf{Abbrev.} & \textbf{Full Form} \\
