@@ -4,7 +4,8 @@
 % PACKAGES
 % =========================================================
 \usepackage[margin=0.75in,top=0.70in,bottom=0.75in,footskip=18pt]{geometry}
-\usepackage{lmodern}
+\usepackage{mathptmx}
+\usepackage[scaled=0.92]{helvet}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
@@ -17,7 +18,7 @@
 \usepackage{titlesec}
 \usepackage{caption}
 \usepackage{subcaption}
-\usepackage{microtype}
+\usepackage[protrusion=true,expansion=false]{microtype}
 \usepackage{setspace}
 \usepackage{color,xcolor}
 \usepackage{pdfpages}
@@ -44,6 +45,7 @@
 }
 \usepackage[pdftex,bookmarksnumbered=true,colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black]{hyperref}
 \usepackage{bookmark}
+\usepackage[natbibapa]{apacite}
 
 % =========================================================
 % DOCUMENT METADATA
@@ -281,7 +283,7 @@ This is to certify that \textbf{Ms. DIVIYA C.} (Register No. \textbf{25MSQUFPY00
 \end{center}
 
 \noindent
-at \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu.
+at \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu, during the period from \textbf{18th June 2026 to 15th August 2026}.
 
 \vspace{0.5cm}
 \noindent
@@ -324,7 +326,7 @@ Her conduct and work ethics during the project were exemplary. We wish her all s
 \end{center}
 
 \noindent
-I, \textbf{DIVIYA C.}, hereby declare that the corporate internship report titled \textbf{``Machine-Learning-Driven Implied Volatility Forecasting \& Relative Option Valuation: An Empirical Study on NIFTY 50 Weekly Index Options''} submitted to the Department of Statistics, Ramanujan School of Mathematical Sciences, Pondicherry University, in partial fulfillment of the requirements for the award of the degree of \textbf{Master of Science in Quantitative Finance}, is a record of original analytical work carried out by me under the institutional mentorship of \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu.
+I, \textbf{DIVIYA C.}, hereby declare that the corporate internship report titled \textbf{``Machine-Learning-Driven Implied Volatility Forecasting \& Relative Option Valuation: An Empirical Study on NIFTY 50 Weekly Index Options''} submitted to the Department of Statistics, Ramanujan School of Mathematical Sciences, Pondicherry University, in partial fulfillment of the requirements for the award of the degree of \textbf{Master of Science in Quantitative Finance}, is a record of original analytical work carried out by me under the institutional mentorship of \textbf{Surabhi Investment Services Pvt. Ltd.}, Tiruchirappalli, Tamil Nadu, during the internship tenure from \textbf{18th June 2026 to 15th August 2026}.
 
 \vspace{0.3cm}
 \noindent
@@ -388,7 +390,26 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 \phantomsection
 \addcontentsline{toc}{chapter}{Table of Contents}
 \setcounter{tocdepth}{1}
+\begingroup
+\makeatletter
+\renewcommand*\l@chapter[2]{%
+  \ifnum \c@tocdepth >\m@ne
+    \addpenalty{-\@highpenalty}%
+    \vskip 0.40em \@plus\p@
+    \setlength\@tempdima{1.5em}%
+    \begingroup
+      \parindent \z@ \rightskip \@pnumwidth
+      \parfillskip -\@pnumwidth
+      \leavevmode \bfseries
+      \advance\leftskip\@tempdima
+      \hskip -\leftskip
+      #1\nobreak\hfil \nobreak\hb@xt@\@pnumwidth{\hss #2}\par
+      \penalty\@highpenalty
+    \endgroup
+  \fi}
+\makeatother
 \tableofcontents
+\endgroup
 
 \newpage
 \phantomsection
@@ -445,6 +466,7 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 \pagestyle{fancy}
 
 \include{chapters/introduction}
+\include{chapters/company_profile}
 \include{chapters/literature_survey}
 \include{chapters/system_design}
 \include{chapters/algorithms}
@@ -457,8 +479,8 @@ Under strict chronological partitioning to guarantee zero temporal look-ahead le
 % =========================================================
 \newpage
 \phantomsection
-\addcontentsline{toc}{chapter}{Bibliography}
-\bibliographystyle{plain}
+\addcontentsline{toc}{chapter}{References}
+\bibliographystyle{apacite}
 \bibliography{references}
 
 % =========================================================

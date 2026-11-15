@@ -2,66 +2,37 @@
 \label{chap:conclusion}
 
 \section{Synthesis of Findings \& Key Research Contributions}
-\label{sec:synthesis_of_findings}
+\label{sec:synthesis_contributions}
 
-This thesis has presented the conception, design, empirical benchmarking, and operational deployment of an end-to-end quantitative machine learning pipeline for **5-minute-ahead implied volatility forecasting ($\Delta \text{IV}_{t+5}$)** and **relative option valuation** on **NIFTY 50 weekly index options** traded on the National Stock Exchange of India (NSE). Conducted under the institutional mentorship of **Surabhi Investment Services Pvt. Ltd.**, the research resolves the persistence assumption paradox in intraday options market making and establishes a rigorous quantitative bridge between high-frequency machine learning and closed-form derivatives pricing.
+This corporate internship research developed, backtested, and operationalized an institutional end-to-end framework for \textbf{5-minute-ahead implied volatility forecasting ($\Delta \text{IV}_{t+5}$)} and \textbf{relative option valuation} on \textbf{NIFTY 50 weekly index options} at \textbf{Surabhi Investment Services Pvt. Ltd.} The quantitative stack addresses critical microstructural and operational challenges in derivatives markets through five primary findings:
 
-The key empirical and methodological contributions of this work are summarized as follows:
-
-\begin{enumerate}
-    \item \textbf{Beating the High-Frequency Persistence Benchmark:}
-    Treating implied volatility as a static random walk ($\widehat{\Delta \text{IV}}_{t+5} = 0$) is standard practice across intraday desks, yet leaves market makers exposed to adverse selection. By engineering multi-horizon autoregressive volatility lags (5m and 10m) and velocity indicators, our tuned Random Forest regressor achieves a **5.28\% reduction in MAE** (0.5214 vs.\ 0.5505) and a **7.72\% reduction in RMSE** (1.2188 vs.\ 1.3207) on out-of-sample test data, confirming Hypothesis 1 ($H_1$).
-
-    \item \textbf{Demonstrating the Structural Inadequacy of Linear Models:}
-    Ordinary Least Squares (OLS) linear regression suffered catastrophic failure, producing an out-of-sample MAE of **6.1720** and negative $R^2 = -0.2410$. This empirically demonstrates that the cross-sectional curvature of the implied volatility smile across moneyness cannot be captured by linear hyperplanes, confirming Hypothesis 2 ($H_2$) and establishing the necessity of non-linear ensembles.
-
-    \item \textbf{Quantifying the Dominance of Volatility Velocity over Static Geometry:}
-    Gini feature importance revealed that recent volatility momentum (\texttt{IV\_change\_prev\_5m} at 7.21\% and \texttt{IV\_change\_prev\_10m} at 6.74\%) and order-book liquidity spreads (\texttt{bid\_ask\_spread} at 3.52\%) account for the majority of predictive variance, far exceeding traditional static strike moneyness and maturity metrics.
-
-    \item \textbf{Formulating Actionable Conviction Thresholds:}
-    While raw directional predictions yield a noisy baseline accuracy of **53.20\%**, filtering for high-conviction forecast magnitudes ($|\widehat{\Delta \text{IV}}| \ge 0.10$) elevates directional hit-rate to **63.40\%** (and **64.47\%** at $\ge 0.25$), providing execution algorithms with a robust filter that eliminates 82\% of low-conviction noise churn, confirming Hypothesis 3 ($H_3$).
-
-    \item \textbf{Operationalizing Relative Option Valuation:}
-    The Relative IV Valuation Engine systematically maps predicted volatility spreads into three distinct economic regimes: **Fair/Neutral (77.92\%)**, **High IV/Rich (15.46\%)**, and **Low IV/Cheap (6.61\%)**, providing quantitative desks with immediate, actionable signals for credit spreads, debit spreads, and delta-neutral market making.
-
-    \item \textbf{Multi-Factor Black-Scholes Stress Testing:}
-    Comprehensive scenario analysis of near-ATM options demonstrated the dominance of Delta over Vega in short-dated contracts. A $+1\%$ spot move generates a $+188.83\%$ gain in option value, whereas a $+20\%$ relative volatility expansion produces only a $+21.33\%$ gain. A combined $-2\%$ market fall with a $+20\%$ volatility spike causes a $-94.84\%$ collapse in call value, proving that long vega cannot protect long calls in sharp directional market crashes.
-
-    \item \textbf{Discovery of the Expiry-Day Structural Regime Breakdown:}
-    Out-of-sample testing on the October 19, 2026 expiry afternoon ($T < 1.58\text{ hours}$) revealed a severe econometric breakdown: model MAE exploded from 0.52 to **17.42**, the persistence baseline outperformed machine learning, and directional accuracy collapsed to **19.09\%**. This proves Hypothesis 4 ($H_4$) and provides formal mathematical proof that continuous-time volatility models collapse under asymptotic gamma/theta singularities and vanishing vega in the final hours of weekly expiry.
-
-    \item \textbf{Production Prototype Deployment:}
-    The analytical system was operationalized via an automated 5-minute live prediction daemon interfacing with the Upstox API v2 and an institutional multi-page dark-themed Streamlit analytics dashboard.
+\begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+    \item \textbf{Subjugation of the Persistence Random Walk:} The tuned Random Forest regressor achieves a \textbf{5.28\% reduction in MAE} (0.5214 vs.\ 0.5505) and a \textbf{7.72\% reduction in RMSE} (1.2188 vs.\ 1.3207) over the persistence benchmark ($\widehat{\Delta \text{IV}} = 0$). While linear OLS fails completely ($R^2 = -0.2410$) due to smile curvature, non-parametric tree ensembles extract actionable predictive signals from intraday quote dynamics.
+    \item \textbf{Dominance of Microstructure Liquidity Over Static Traits:} Feature importance analysis demonstrates that short-term volatility velocity ($\text{IV}_{\text{change}, 5\text{m}}$) and bid-ask spreads account for the vast majority of split variance. Static contractual features (strike price $K$, moneyness $K/S$, TTE) provide contextual conditioning, but order-book liquidity dynamics drive immediate volatility revisions.
+    \item \textbf{Monetizing Directional Edge via Conviction Thresholding:} Filtering trading signals by directional conviction ($|\widehat{\Delta\text{IV}}| \ge 0.10$) elevates directional hit-rate from \textbf{53.20\% to 63.40\%}, filtering uninformative noise around the zero boundary and generating high-probability trade setups for spread execution.
+    \item \textbf{Practical Relative Valuation \& Multi-Factor Stress Testing:} The production engine categorizes cross-sectional contracts into \textbf{Fair (77.92\%)}, \textbf{Rich (15.46\%)}, and \textbf{Cheap (6.61\%)} regimes, enabling systematic credit/debit spread structuring. Closed-form Greek stress testing quantifies portfolio sensitivities under spot and volatility shocks.
+    \item \textbf{Forensic Discovery of the Expiry-Day Regime Shift:} Stress testing across an unseen expiry day revealed a severe structural breakdown ($\text{MAE} = 17.42$), proving that models trained on mid-week data suffer severe covariate shift during the hyper-gamma, vanishing-vega final hours.
 \end{enumerate}
 
 \section{Operational Recommendations for Institutional Trading Desks}
-\label{sec:desk_recommendations}
+\label{sec:operational_recommendations}
 
-Based on the empirical findings, the following operational protocols are recommended for proprietary trading and advisory desks, specifically at **Surabhi Investment Services Pvt. Ltd.**:
+Based on these empirical findings, four operational protocols are recommended for proprietary trading and derivatives advisory desks at \textbf{Surabhi Investment Services Pvt. Ltd.}:
 
-\subsection{1. Dynamic Quote Shading in Market Making}
-Proprietary market-making algorithms quoting bid-ask spreads around mid-market should replace static persistence assumptions with model forecasts $\widehat{\text{IV}}_{t+5}$. When the model projects an upward volatility momentum shock ($\widehat{\Delta \text{IV}} > +0.10$), the automated quoter should shade its bid higher and widen its ask, capturing edge and avoiding toxic adverse selection by informed market orders.
-
-\subsection{2. Mandatory Gating on Systematic Trade Execution}
-Options desks executing directional volatility plays (long straddles, vega scalping) should enforce the **$\theta = 0.10$ IV Point Conviction Rule**. Restricting order entry exclusively to contracts where $|\widehat{\Delta \text{IV}}| \ge 0.10$ delivers a 63.40\% directional edge while eliminating over 80\% of brokerage and exchange transaction fee overhead.
-
-\subsection{3. Relative Value Portfolio Construction}
-Traders should systematically exploit the Relative IV Valuation screener:
-\begin{itemize}
-    \item When a strike is flagged as **Rich / Overvalued** ($\text{Spread} > +0.50$), initiate short credit spreads (e.g., sell the rich strike, buy a farther OTM wing) to capture implied volatility compression.
-    \item When a strike is flagged as **Cheap / Undervalued** ($\text{Spread} < -0.50$), initiate long debit spreads or diagonal calendar spreads to capture prospective volatility expansion.
-\end{itemize}
-
-\subsection{4. Protocol for the Expiry-Day Regime Shift: The 2-Hour Kill Switch}
-Desks must establish a strict risk rule: **automatically deactivate machine-learning volatility models exactly 2.0 hours prior to weekly contract settlement (13:30 IST on expiry day)**. As documented in Chapter \ref{chap:results}, non-expiry models suffer catastrophic covariate shift and numerical instability as $\tau \to 0$. From 13:30 to 15:30 IST, desks should transition exclusively to parity arbitrage, intrinsic value boundary tracking, and pure gamma-scalping execution rules.
+\begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+    \item \textbf{Dynamic Quote Shading in Market Making:} Automated market-making algorithms quoting bid-ask spreads around mid-market should replace static persistence assumptions with model forecasts $\widehat{\text{IV}}_{t+5}$. When an upward volatility shock ($\widehat{\Delta \text{IV}} > +0.10$) is projected, the automated quoter should shade its bid higher and widen its ask, capturing edge and mitigating toxic adverse selection.
+    \item \textbf{Mandatory Conviction Gating ($\theta = 0.10$):} Desks executing directional volatility plays (long straddles, vega scalping) should enforce the conviction rule ($|\widehat{\Delta \text{IV}}| \ge 0.10$), capturing a 63.40\% directional edge while eliminating over 80\% of uninformative fee-generating churn.
+    \item \textbf{Relative Value Spread Construction:} Systematic desks should exploit Relative IV tags: initiating credit spreads when strikes are \textbf{Rich} ($\text{Spread} > +0.50$) to capture IV compression, and debit or diagonal spreads when strikes are \textbf{Cheap} ($\text{Spread} < -0.50$) to capture volatility expansion.
+    \item \textbf{The 2-Hour Expiry Kill Switch:} Desks must establish a hard stop: \textbf{automatically deactivate machine-learning volatility models exactly 2.0 hours prior to weekly contract settlement (13:30 IST on expiry day)}. As demonstrated in Chapter \ref{chap:results}, non-expiry models suffer extreme covariate shift as $\tau \to 0$. From 13:30 to 15:30 IST, desks must transition exclusively to parity arbitrage, boundary tracking, and gamma-scalping.
+\end{enumerate}
 
 \section{Limitations of the Current Study}
 \label{sec:limitations}
 
 While empirical results demonstrate robust predictive performance, several academic and operational limitations should be acknowledged:
-\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
-    \item \textbf{Temporal Sample Window:} The dataset covers weekly expiry cycles in October 2026. Long-term multi-year backtesting across bull markets, bear regimes, and high-volatility macro crises would provide broader longitudinal generalization.
-    \item \textbf{Strike Geometry Restriction:} The study focused on liquid near-ATM options ($0.95 \le K/S \le 1.05$). Deep out-of-the-money wings (carrying extreme tail-risk information) were excluded to avoid quote illiquidity noise.
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+    \item \textbf{Temporal Sample Window:} The dataset covers weekly expiry cycles in October 2026. Multi-year backtesting across bull markets, bear regimes, and macro crises would provide broader longitudinal generalization.
+    \item \textbf{Strike Geometry Restriction:} The study focused on liquid near-ATM options ($0.95 \le K/S \le 1.05$). Deep out-of-the-money wings carrying extreme tail risk were excluded to avoid quote illiquidity noise.
     \item \textbf{Sampling Frequency:} Regularized 5-minute snapshots were analyzed. While optimal for algorithmic intraday positioning and quote shading, sub-second HFT desks require tick-by-tick order-book depth to model millisecond queue dynamics.
     \item \textbf{Execution Slippage Modeling:} While microstructure spreads were integrated into feature engineering, live P\&L backtests did not simulate explicit execution queue positions or exchange connectivity latency.
 \end{enumerate}
@@ -69,11 +40,10 @@ While empirical results demonstrate robust predictive performance, several acade
 \section{Directions for Future Quantitative Research}
 \label{sec:future_research}
 
-The findings and infrastructure established in this thesis suggest several promising pathways for future academic and industry research:
-
-\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
-    \item \textbf{Deep Sequential Architectures \& Attention Mechanisms:} Future iterations could explore deep sequence models—such as Temporal Fusion Transformers (TFT) or Bidirectional LSTM networks with self-attention—trained on rolling sequences of order-book messages to capture long-range dependencies.
-    \item \textbf{Explicit Markov-Switching Regime Models:} To resolve the expiry collapse, future research should develop a Markov-Switching Vector Autoregressive (MS-VAR) framework that models the continuous transition between the Normal Trading Regime ($T > 6\text{h}$) and the Hyper-Gamma Expiry Regime ($T < 2\text{h}$) as an endogenous latent state.
-    \item \textbf{Cross-Asset Volatility Spillover Networks:} Expanding the feature space to include cross-asset signals—such as BankNIFTY implied volatility, India VIX, USD/INR currency option volatility, and overnight US S\&P 500 VIX movements—would capture macro risk contagion across correlated financial markets.
-    \item \textbf{Reinforcement Learning for Automated Delta-Vega Hedging:} Rather than utilizing static heuristic trading rules, future work could train a Deep Q-Network (DQN) or Proximal Policy Optimization (PPO) agent that dynamically adjusts portfolio delta and vega hedges conditioned on live model predictions under realistic transaction friction.
+The infrastructure established in this study suggests four promising pathways for future research:
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+    \item \textbf{Deep Sequential Architectures:} Exploring Temporal Fusion Transformers (TFT) or Bidirectional LSTM networks with self-attention trained on rolling order-book sequences to capture long-range temporal dependencies.
+    \item \textbf{Markov-Switching Regime Models:} Developing a Markov-Switching Vector Autoregressive (MS-VAR) framework modeling the continuous transition between Normal Trading ($T > 6\text{h}$) and Hyper-Gamma Expiry ($T < 2\text{h}$) as an endogenous latent state.
+    \item \textbf{Cross-Asset Volatility Spillover Networks:} Expanding the feature space to include cross-asset signals—such as BankNIFTY IV, India VIX, USD/INR currency option volatility, and overnight US S\&P 500 VIX movements.
+    \item \textbf{Reinforcement Learning for Automated Hedging:} Training Deep Q-Networks (DQN) or Proximal Policy Optimization (PPO) agents that dynamically adjust portfolio delta and vega hedges conditioned on live model predictions under transaction friction.
 \end{enumerate}

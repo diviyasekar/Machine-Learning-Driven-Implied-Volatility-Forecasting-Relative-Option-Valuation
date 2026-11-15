@@ -85,16 +85,17 @@ The analytical framework adheres strictly to quantitative finance best practices
     \item \textbf{Economic Interpretability:} All machine learning forecasts are mapped directly to closed-form Black-Scholes pricing and operational relative valuation screeners.
 \end{itemize}
 
-\section{Organization of the Thesis}
+\section{Organization of the Report}
 \label{sec:thesis_organization}
 
-The remainder of this report is organized as follows:
+The remainder of this report is organized into the following eight chapters and appendices:
 \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
-    \item \textbf{Chapter \ref{chap:literature_survey}} reviews option pricing theory, BSM assumptions, implied volatility surface geometry, and machine learning applications in derivatives.
-    \item \textbf{Chapter \ref{chap:system_design}} details system taxonomy, Upstox API ingestion, data sanitation, exact fractional TTE engineering, and feature pipelines.
-    \item \textbf{Chapter \ref{chap:algorithms}} details the institutional Greeks framework, carry equilibria, the Newton-Raphson solver, and predictive model formulations.
-    \item \textbf{Chapter \ref{chap:implementation}} details software engineering architecture, live daemon execution, and the institutional multi-page Streamlit dashboard.
-    \item \textbf{Chapter \ref{chap:results}} presents empirical benchmarks against persistence, impurity importance, conviction thresholding, stress testing, and the expiry breakdown.
-    \item \textbf{Chapter \ref{chap:conclusion}} synthesizes findings, provides operational recommendations for trading desks, outlines limitations, and identifies future scope.
+    \item \textbf{Chapter \ref{chap:company_profile}} presents the corporate profile of Surabhi Investment Services Pvt. Ltd., detailing its business verticals, organizational governance, and the operational mandate of the Equity and Derivatives Desk during the internship tenure (18/06/2026 to 15/08/2026).
+    \item \textbf{Chapter \ref{chap:literature_survey}} reviews foundational option pricing theory, BSM assumptions, volatility surface geometry, and machine learning advances in derivative modeling.
+    \item \textbf{Chapter \ref{chap:system_design}} details the end-to-end system taxonomy, Upstox API ingestion, data hygiene, exact fractional TTE engineering, and feature extraction pipelines.
+    \item \textbf{Chapter \ref{chap:algorithms}} provides the mathematical formulations for Black-Scholes Greeks, the Newton-Raphson volatility solver, and predictive model formulations.
+    \item \textbf{Chapter \ref{chap:implementation}} outlines the software engineering architecture, background live streaming daemon, and the interactive Streamlit analytics dashboard.
+    \item \textbf{Chapter \ref{chap:results}} presents empirical benchmarks against persistence, feature importance, directional conviction filtering, Greek stress testing, and the expiry-day breakdown.
+    \item \textbf{Chapter \ref{chap:conclusion}} synthesizes key empirical conclusions, establishes operational risk protocols for options desks, and identifies directions for future research.
     \item \textbf{Appendices} provide the complete 39-feature schema specification and core algorithmic Python source modules.
 \end{itemize}

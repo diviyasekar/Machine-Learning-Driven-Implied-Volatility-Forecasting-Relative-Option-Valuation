@@ -6,46 +6,38 @@
 
 The modern quantitative modeling of financial derivatives originates from the foundational work of Fischer Black, Myron Scholes \cite{black1973pricing}, and Robert Merton \cite{merton1973theory}. The core insight of the Black-Scholes-Merton (BSM) framework was the construction of a continuously rebalanced, risk-free hedging portfolio combining the underlying asset and a derivative contract. By eliminating market risk through continuous dynamic hedging, Black, Scholes, and Merton derived a closed-form analytical solution for European option prices.
 
-For a European call option $C$ and put option $P$ with strike price $K$ and time-to-expiry $\tau = T - t$, the canonical BSM formulas are:
+For a European call option $C$ and put option $P$ with strike price $K$ and time-to-expiry $\tau = T - t$, the canonical BSM pricing formulas are:
 \begin{equation}
-    C = S_t N(d_1) - K e^{-r\tau} N(d_2), \quad P = K e^{-r\tau} N(-d_2) - S_t N(-d_1)
+    C = S_t N(d_1) - K e^{-r\tau} N(d_2), \qquad P = K e^{-r\tau} N(-d_2) - S_t N(-d_1)
     \label{eq:bsm_call_lit}
 \end{equation}
-where $S_t$ is the spot price of the underlying asset, $r$ is the continuously compounded risk-free interest rate, $N(\cdot)$ is the cumulative standard normal distribution function, and:
-\begin{equation}
-    d_1 = \frac{\ln(S_t / K) + \left(r + \frac{1}{2}\sigma^2\right)\tau}{\sigma \sqrt{\tau}}, \quad d_2 = d_1 - \sigma \sqrt{\tau}
-\end{equation}
+where $S_t$ is the spot price of the underlying asset, $r$ is the continuously compounded risk-free rate, $N(\cdot)$ is the cumulative standard normal distribution, and $d_1 = \frac{\ln(S_t / K) + (r + \frac{1}{2}\sigma^2)\tau}{\sigma \sqrt{\tau}}$ with $d_2 = d_1 - \sigma \sqrt{\tau}$.
 
-The model relies on several simplifying market assumptions:
+The model relies on classical idealized market assumptions:
 \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Geometric Brownian Motion:} Asset prices follow continuous diffusion with constant drift and constant return volatility $\sigma$.
     \item \textbf{Frictionless Electronic Markets:} Zero transaction costs, zero bid-ask spread friction, and unrestricted short-selling.
-    \item \textbf{Continuous Trading:} Portfolios can be continuously rebalanced at infinitesimal intervals without price slippage or market impact.
-    \item \textbf{Stationary Parameters:} The risk-free rate $r$ and volatility $\sigma$ remain known and constant throughout the life of the contract.
+    \item \textbf{Continuous Trading:} Portfolios can be continuously rebalanced at infinitesimal intervals without price slippage.
+    \item \textbf{Stationary Parameters:} The risk-free rate $r$ and volatility $\sigma$ remain known and constant throughout the contract lifetime.
 \end{itemize}
 While the BSM formula remains the standard quoting convention of global derivatives exchanges, its theoretical assumption of constant volatility is systematically violated in live financial markets.
 
 \section{The Implied Volatility Surface: Smile, Skew, and Term Structure}
 \label{sec:iv_surface_dynamics}
 
-In live options markets, volatility $\sigma$ is an unobservable parameter. Traders invert the BSM formula numerically using observed transaction prices $C_{\text{market}}$ to determine the \textbf{Implied Volatility ($\sigma_{\text{implied}}$)}:
+In live options markets, volatility $\sigma$ is an unobservable latent parameter. Traders invert the BSM formula numerically using observed market transaction prices $C_{\text{market}}$ to recover the \textbf{Implied Volatility ($\sigma_{\text{implied}}$)}:
 \begin{equation}
     C_{\text{market}} - C_{\text{BSM}}(S_t, K, \tau, r, \sigma_{\text{implied}}) = 0
 \end{equation}
 
-If the BSM model reflected reality perfectly, inverting the formula across different strikes $K$ and expiration dates $T$ would yield a constant volatility plane. However, empirical option markets exhibit distinct structural variations across strike and maturity, giving rise to the 3D \textbf{Implied Volatility Surface}:
-\begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
-    \item \textbf{Pronounced Negative Skew:} Out-of-the-money (OTM) put options (low strikes, $K < S$) trade at significantly higher implied volatilities than out-of-the-money call options, reflecting downside portfolio insurance demand ("crashophobia") and corporate leverage.
-    \item \textbf{Smile Curvature (Convexity):} OTM and deep ITM wings exhibit elevated implied volatility relative to at-the-money (ATM) contracts, pricing fat-tailed return distributions.
-    \item \textbf{Term Structure of Volatility:} Implied volatility varies systematically with time-to-expiry, sloping upward in calm regimes (contango) and spiking during market stress (backwardation).
-\end{itemize}
+If BSM reflected reality perfectly, inverting the formula across different strikes $K$ and maturities $T$ would yield a constant horizontal plane. However, empirical markets exhibit structural variations across strike and maturity, giving rise to the 3D \textbf{Implied Volatility Surface}: (1)~\textbf{Pronounced Negative Skew}, where out-of-the-money (OTM) put options ($K < S$) trade at higher implied volatilities than OTM calls due to downside insurance demand (``crashophobia''); (2)~\textbf{Smile Curvature (Convexity)}, where OTM and deep ITM wings exhibit elevated implied volatility relative to ATM contracts; and (3)~\textbf{Term Structure}, where implied volatility systematically varies with time-to-expiry $\tau$.
 
-To resolve the volatility smile, continuous-time finance introduced \textbf{Local Volatility} models (Dupire, 1994; Derman and Kani \cite{derman1994riding}) and \textbf{Stochastic Volatility} models (most notably Heston \cite{heston1993closed}). While stochastic volatility allows volatility itself to follow a mean-reverting random process correlated with the underlying spot price, these continuous-time models require intensive computational recalibration and cannot directly incorporate discrete limit order book microstructure features.
+To resolve the volatility smile, continuous-time finance introduced \textbf{Local Volatility} models (Dupire, 1994; Derman and Kani \cite{derman1994riding}) and \textbf{Stochastic Volatility} models (most notably Heston \cite{heston1993closed}). While stochastic volatility allows volatility to follow a mean-reverting process correlated with spot price, continuous-time models require intensive recalibration and cannot directly incorporate discrete limit order book microstructure features.
 
 \section{Econometric Approaches to Volatility Modeling}
 \label{sec:econometric_approaches}
 
-Before the adoption of machine learning, financial econometricians modeled time-series volatility through discrete-time autoregressive processes, pioneered by Robert Engle's \textbf{ARCH} model \cite{engle1982autoregressive} and generalized by Tim Bollerslev into \textbf{GARCH} \cite{bollerslev1986generalized}. In high-frequency finance, Andersen et al. \cite{andersen2003modeling} showed that summing intraday squared returns yields non-parametric measures of \textbf{Realized Volatility (RV)}.
+Before machine learning adoption, econometricians modeled time-series volatility through discrete autoregressive processes, pioneered by Robert Engle's \textbf{ARCH} model \cite{engle1982autoregressive} and generalized by Tim Bollerslev into \textbf{GARCH} \cite{bollerslev1986generalized}. In high-frequency finance, Andersen et al. \cite{andersen2003modeling} showed that summing intraday squared returns yields non-parametric measures of \textbf{Realized Volatility (RV)}.
 
 While ARCH, GARCH, and Realized Volatility capture volatility clustering and persistence in historical stock returns, they model the physical probability measure ($\mathbb{P}$) of the underlying asset rather than the forward-looking risk-neutral measure ($\mathbb{Q}$) priced into option contracts. Furthermore, classical time-series models assume parametric linear relationships that struggle to adapt to the ultra-short, non-linear 5-minute sampling intervals of modern electronic derivatives desks.
 
@@ -55,8 +47,8 @@ While ARCH, GARCH, and Realized Volatility capture volatility clustering and per
 Over the past decade, institutional trading firms have increasingly adopted non-parametric machine learning architectures for derivatives modeling \cite{lopez2018advances}. Machine learning provides three distinct advantages over classical econometric models:
 \begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
     \item \textbf{Model-Free Flexibility:} Algorithms learn complex volatility dynamics directly from market data without imposing rigid diffusion assumptions.
-    \item \textbf{Multi-Dimensional Feature Ingestion:} Ensembles can simultaneously process cross-sectional strike geometry, multi-horizon price momentum, and order-book liquidity metrics.
-    \item \textbf{Non-Linear Interaction Capture:} Tree-based models automatically capture non-linear interactions, such as how the impact of order-book spreads on volatility changes depending on whether a contract is at-the-money or deep out-of-the-money.
+    \item \textbf{Multi-Dimensional Feature Ingestion:} Ensembles simultaneously process cross-sectional strike geometry, multi-horizon price momentum, and order-book liquidity metrics.
+    \item \textbf{Non-Linear Interaction Capture:} Tree-based models automatically capture non-linear interactions, such as how the impact of order-book spreads on volatility changes depending on moneyness.
 \end{enumerate}
 
 \subsection{Random Forests}
@@ -76,7 +68,7 @@ In market microstructure theory, the bid-ask spread reflects three primary opera
     \item \textbf{Inventory Holding Risk:} The risk of holding unhedged options positions during sudden market reversals.
     \item \textbf{Adverse Selection (Informed Trading):} As formulated by Glosten and Milgrom \cite{glosten1985bid}, market makers widen spreads when facing informed counterparties possessing superior information about impending underlying moves or volatility shifts.
 \end{itemize}
-In intraday options trading, sudden spread widening frequently precedes sharp adjustments in implied volatility. Incorporating order book spreads directly into feature engineering provides machine learning models with early warning signals of liquidity withdrawal. Furthermore, near weekly settlement, market makers face **Pin Risk**—the uncertainty over whether an at-the-money option will expire in- or out-of-the-money—leading to extreme order book volatility.
+In intraday options trading, sudden spread widening frequently precedes sharp adjustments in implied volatility. Incorporating order book spreads directly into feature engineering provides machine learning models with early warning signals of liquidity withdrawal. Near weekly settlement, market makers face **Pin Risk**—the uncertainty over whether an at-the-money option will expire in- or out-of-the-money—leading to extreme order book volatility.
 
 \section{Identification of the Research Gap}
 \label{sec:research_gap}
