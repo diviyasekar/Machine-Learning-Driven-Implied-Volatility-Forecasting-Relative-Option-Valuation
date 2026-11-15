@@ -4,15 +4,15 @@
 \section{Appendix A: Complete 39-Dimensional Feature Schema Specification}
 \label{sec:appendix_feature_schema}
 
-The production machine learning pipeline serializes an exact 39-dimensional feature schema in the model artifact file \path{nifty_iv_model_features.joblib}. During live execution, incoming option chain snapshots are aligned against this schema, stripping extraneous fields and applying median imputation to ensure fault-tolerant inference. Table \ref{tab:complete_feature_schema} outlines all 39 features, their temporal lag horizons, and their quantitative formulations.
+The production machine learning pipeline serializes an exact 39-dimensional feature schema in the model artifact file \path{nifty_iv_model_features.joblib}. Incoming option chain snapshots are aligned against this schema, stripping extraneous fields and applying median imputation to ensure fault-tolerant inference. Table \ref{tab:complete_feature_schema} outlines all 39 features, their temporal lag horizons, and their quantitative formulations.
 
 \begin{table}[H]
     \centering
     \scriptsize
-    \renewcommand{\arraystretch}{0.85}
+    \renewcommand{\arraystretch}{0.75}
     \caption{Complete 39-Dimensional Feature Schema Specification.}
     \label{tab:complete_feature_schema}
-    \begin{tabularx}{\textwidth}{rllp{2.2cm}X}
+    \begin{tabularx}{\textwidth}{rllp{2.0cm}X}
         \toprule
         \textbf{\#} & \textbf{Feature Name} & \textbf{Type} & \textbf{Lag Horizon} & \textbf{Quantitative Formulation / Meaning} \\
         \midrule
@@ -34,27 +34,26 @@ The production machine learning pipeline serializes an exact 39-dimensional feat
     \end{tabularx}
 \end{table}
 
+\vspace{-0.3cm}
 \section{Appendix B: Core Algorithmic Source Code Modules}
 \label{sec:appendix_source_code}
 
-This appendix provides the core Python implementation modules used for exact time-to-expiry calculation, autoregressive lag feature construction, real-time live inference, and relative option valuation categorization.
+\lstset{basicstyle=\ttfamily\fontsize{5.5pt}{6.5pt}\selectfont, numbers=left, numbersep=2pt, xleftmargin=0.8em, lineskip=-1.5pt}
 
-\lstset{basicstyle=\ttfamily\tiny, numbers=left, numbersep=3pt, xleftmargin=1.0em, lineskip=-1.5pt}
-
-\subsection{B.1 Exact Fractional TTE Calculation \& Vectorized Lag Construction}
-Listing \ref{lst:tte_lags} details the vectorized computation of fractional Time-to-Expiry in hours and the construction of rolling autoregressive lags across option chain snapshots.
-
-\begin{lstlisting}[language=Python, caption={Exact Fractional TTE and Multi-Horizon Lag Construction.}, label={lst:tte_lags}]
+\noindent
+\begin{minipage}[t]{0.49\textwidth}
+\textbf{Listing B.1: Exact TTE \& Vectorized Lags}
+\begin{lstlisting}[language=Python]
 import pandas as pd
 
 def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # Fractional hours to expiry (standardized to 15:30 IST on weekly expiry)
+    # Standardized to 15:30 IST on weekly expiry
     df['expiry_dt'] = pd.to_datetime(df['expiry']) + pd.Timedelta(hours=15, minutes=30)
     df['exact_tte_hours'] = (df['expiry_dt'] - pd.to_datetime(df['timestamp'])).dt.total_seconds() / 3600.0
     df['exact_tte_hours'] = df['exact_tte_hours'].clip(lower=1e-5)
     
-    # Sort and construct autoregressive lags by contract key
+    # Sort and construct lags by contract key
     df = df.sort_values(by=['strike', 'option_type', 'timestamp'])
     grp = df.groupby(['strike', 'option_type'])
     df['IV_lag_5m'] = grp['IV'].shift(1)
@@ -64,20 +63,20 @@ def compute_exact_tte_and_lags(df: pd.DataFrame) -> pd.DataFrame:
     df['bid_ask_spread_lag_5m'] = grp['bid_ask_spread'].shift(1)
     return df
 \end{lstlisting}
-
-\subsection{B.2 Production Live Inference \& Relative Valuation Screener}
-Listing \ref{lst:live_inference} presents the production live inference routine that maps real-time feature matrices into 5-minute volatility forecasts and assigns actionable economic valuation tags.
-
-\begin{lstlisting}[language=Python, caption={Production Live Inference and Valuation Categorization.}, label={lst:live_inference}]
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.49\textwidth}
+\textbf{Listing B.2: Production Live Inference \& Valuation}
+\begin{lstlisting}[language=Python]
 import numpy as np
 
-def run_live_inference_and_valuation(current_features, model, schema, medians, delta_val=0.50):
-    # Align features against strict training schema and fill residual NaNs
-    X = current_features.reindex(columns=schema).fillna(medians)
+def run_live_inference_and_valuation(features, model, schema, medians, delta_val=0.50):
+    # Align features against training schema
+    X = features.reindex(columns=schema).fillna(medians)
     
-    # Predict 5-minute volatility change and expected future IV
+    # Predict 5m volatility change and future IV
     pred_delta_iv = model.predict(X)
-    current_iv = current_features['IV'].values
+    current_iv = features['IV'].values
     pred_future_iv = current_iv + pred_delta_iv
     valuation_spread = current_iv - pred_future_iv
     
@@ -86,3 +85,4 @@ def run_live_inference_and_valuation(current_features, model, schema, medians, d
               np.where(valuation_spread < -delta_val, 'Cheap / Undervalued', 'Fair / Neutral'))
     return pred_future_iv, pred_delta_iv, valuation_spread, regimes
 \end{lstlisting}
+\end{minipage}
